@@ -10,9 +10,14 @@ import os
 
 
 def make_part_filter(index):
+    def part_filter(split_index,iterator):
+        if split_index==index:
+            for element in iterator:
+                yield element;
     
+    return part_filter;
+        
     
-
 if __name__ == '__main__':
     
     #configure the spark environment
@@ -27,14 +32,18 @@ if __name__ == '__main__':
 #        
 #     for wc in word_count.collect():
 #         print wc
-    data = ["a","b","c","d"];
+    data = sc.textFile("/Users/Uzwal/Desktop/SVMDataSet.csv");
     distributedDataset = sc.parallelize(data,4);
     local_data_taken_from_distribution = distributedDataset.getNumPartitions();
+    index = 2;
     for part in range(local_data_taken_from_distribution):
         part_rdd = distributedDataset.mapPartitionsWithIndex(make_part_filter(part),True);
-        
-       
-       
+        data_for_one_node = part_rdd.collect();
+        print(" the data for %s node is : %s" %(part,data_for_one_node));    
+
+#     part_rdd = distributedDataset.mapPartitionsWithIndex(make_part_filter(index),True);
+#     data_for_one_node = part_rdd.collect();
+#     print(" the data for %s node is : %s" %(index,data_for_one_node));    
         
     print("the number of partitions are %s"%local_data_taken_from_distribution);
    
