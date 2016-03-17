@@ -10,9 +10,14 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 class customHTTPRequestHandler(BaseHTTPRequestHandler):
     # method for handling the http request from the client
     def do_GET(self):
-        output_directory = "/Users/Uzwal/Documents/workspace/bilevel/WebContent";
+        output_directory = "//WALL3/Users/walluser/git/D3EventServer/D3/WebContent";
         try:
             if self.path.endswith(".csv"):
+                print(self.client_address);
+                file_to_send = open(output_directory + self.path, "r");  # opening the file to send
+                # sending file to client via output stream
+                self.wfile.write(file_to_send.read()) 
+            elif self.path.endswith(".json"):
                 print(self.client_address);
                 file_to_send = open(output_directory + self.path, "r");  # opening the file to send
                 # sending file to client via output stream
@@ -25,7 +30,7 @@ class customHTTPRequestHandler(BaseHTTPRequestHandler):
 
 def runServer():
     try:
-        server_address = ("127.0.0.1", 8085);
+        server_address = ("192.168.10.3", 8085);
         httpServer = HTTPServer(server_address, customHTTPRequestHandler);
         print("web server is running");
         httpServer.serve_forever();     
@@ -36,7 +41,7 @@ def runServer():
 
 def sendFile():
     try:
-        file_path = "/Users/Uzwal/Documents/workspace/bilevel/WebContent/dataSetForBarChart.csv";
+        file_path = "//WALL3/Users/walluser/git/D3EventServer/D3/WebContent/dataSetForBarChart.csv";
         file_read = open(file_path, "r");
         for line in file_read:
             print(line);
