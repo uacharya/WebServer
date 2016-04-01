@@ -13,18 +13,28 @@ def make_part_filter(index):
     def part_filter(split_index, iterator):
         if split_index == index:
             for element in iterator:
-                yield element;
+                for content in element:
+                    yield str(content);
     
     return part_filter;
-        
+
+def to_CSV(data,header):
+    data = header+data;
+    return "\n".join(data);
+
+def write_data_to_file(index,data):
+    file_output_path =  "/Users/Uzwal/Desktop/output"+index+".csv";
+    file_write = open(file_output_path,"w");
+    for line in data:
+        file_write.write(line)
     
+        
 if __name__ == '__main__':
     
     # configure the spark environment
     sparkConf = SparkConf().setAppName("WordCount").setMaster("local[4]")
     sc = SparkContext(conf=sparkConf);
-    
-    
+        
 #     #The wordcount Spark Program
 #     text_file = sc.textFile(os.environ['SPARK_HOME']+"/README.md");
 #     print(text_file);
@@ -32,30 +42,21 @@ if __name__ == '__main__':
 #        
 #     for wc in word_count.collect():
 #         print wc
-    data = sc.textFile("C:/Users/walluser/git/D3EventServer/D3/WebContent/dataSetForBarChart.csv").map(lambda line:line.split()).collect();
+    data = sc.textFile("/Users/Uzwal/Desktop/SVMDataSet.csv").map(lambda data:data.split("\n")).collect();
     header_of_file = data[0];
     data_from_file = data[1:];
     distributedDataset = sc.parallelize(data_from_file, 3);
     local_data_taken_from_distribution = distributedDataset.getNumPartitions();
-    index = 0;
-#     for part in range(local_data_taken_from_distribution):
-#         part_rdd = distributedDataset.mapPartitionsWithIndex(make_part_filter(part),True);
-#         data_for_one_node = part_rdd.collect();
-#         print(" the data for %s node is : %s" %(part,data_for_one_node));    
-# 
-    part_rdd = distributedDataset.mapPartitionsWithIndex(make_part_filter(index),True);
-    data_for_one_node = part_rdd.collect();
-   
-    print(" the data for %s node is : %s" %(index,data_for_one_node));   
+    index = 1;
     
-    file_output_path =  "C:/Users/walluser/Desktop/output.csv";
-    file_write = open(file_output_path,"w");
-    for line in data_for_one_node:
-        file_write.write(str(line))
-# #         
-#     print("the number of partitions are %s"%local_data_taken_from_distribution);
-#    
-#     
-#     
-#     print(distributedDataset.reduce(lambda a,b:a+b));
+    for part in range(local_data_taken_from_distribution):
+        part_rdd = distributedDataset.mapPartitionsWithIndex(make_part_filter(part),True);
+        data_for_one_node = part_rdd.collect();
+        convert_data_to_required_file = to_CSV(data_for_one_node,header_of_file);
+        print(" the data for %s node is : %s" %(part,convert_data_to_required_file));  
+          
+     
+    print("the number of partitions are %s"%local_data_taken_from_distribution);
+    
+    sc.stop();
 
