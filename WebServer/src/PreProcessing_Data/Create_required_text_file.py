@@ -27,6 +27,8 @@ class Data():
                             value = value+required_fields[index]+" ";
                     
                     countries_name_with_abbrevations[key] = value;
+                    
+            file_to_read.close();
             
             return countries_name_with_abbrevations;        
             
@@ -57,7 +59,8 @@ class Data():
                             station_id_into_country_name[key] = value;
             
             
-            print(len(station_id_into_country_name));
+            file_to_read.close();
+            
             self._write_to_a_file(station_id_into_country_name);
 
         except IOError:
@@ -80,6 +83,51 @@ class Data():
             file_open.close();
         except IOError:
             print("something went wrong while writing");
+            
+    def create_only_required_data(self,total_dataset,station_name):
+        try:
+            file_open_for_creating_dictionaries = open(station_name,"r");
+            total_list_of_stations = file_open_for_creating_dictionaries.readlines();
+            
+            countries_name_with_station_id = {};
+            
+            for counter in range(len(total_list_of_stations)):
+                if(counter>0):
+                    total_fields = total_list_of_stations[counter].split("\t");
+                    countries_name_with_station_id[total_fields[0]] = total_fields[1];
+                    
+            file_open_for_creating_dictionaries.close();
+            
+            self._create_final_global_dataset(total_dataset,countries_name_with_station_id);
+            
+        except IOError:
+            print("The file was not found for creating dictionaries");
+        
+    
+    def _create_final_global_dataset(self,total_dataset,station_name):
+        try:
+            dataset_open = open(total_dataset,"r");
+            total_lines = dataset_open.readlines();
+            
+            output_file = "C:/Users/walluser/preprocess_combined.txt";
+            file_to_write_to = open(output_file,"w");
+            
+            file_to_write_to.write("STATION\tYEARMODA\tTEMPERATURE\tDEW\tSEALEVELPRESSURE\tVISIBILITY\tWINDSPEED\tMAXWINDSPEED\tWINDGUST\tMAXTEMP\tMINTEMP\tPRECIPITATION\tSNOWDEPTH");
+            
+            for line in total_lines:
+                if(station_name.get(line[:12])!=None):
+                    print(station_name.get(line[:12])+"\t"+line[14:22]
+                          +"\t"+line[26:30]+"\t"+line[37:42]+"\t"+line[46:52]+"\t"+line[69:74]+"\t"
+                          +line[79:83]+"\t"+line[89:93]+"\t"+line[95:100]+"\t"+line[103:108]+"\t"+line[111:116]
+                          +"\t"+line[118:123]+"\t"+line[125:130]);
+                        
+                    
+                    
+            
+            
+            
+        except IOError:
+            print("total dataset file was not found");
         
 
 if __name__ == '__main__':
