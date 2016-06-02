@@ -109,22 +109,24 @@ class Data():
             dataset_open = open(total_dataset,"r");
             total_lines = dataset_open.readlines();
             
-            output_file = "C:/Users/walluser/preprocess_combined.txt";
+            output_file = "C:/Users/walluser/final_total_weather_dataset.txt";
             file_to_write_to = open(output_file,"w");
             
             file_to_write_to.write("STATION\tYEARMODA\tTEMPERATURE\tDEW\tSEALEVELPRESSURE\tVISIBILITY\tWINDSPEED\tMAXWINDSPEED\tWINDGUST\tMAXTEMP\tMINTEMP\tPRECIPITATION\tSNOWDEPTH");
-            
+            file_to_write_to.write("\n");
             for line in total_lines:
                 if(station_name.get(line[:12])!=None):
-                    print(station_name.get(line[:12])+"\t"+line[14:22]
-                          +"\t"+line[26:30]+"\t"+line[37:42]+"\t"+line[46:52]+"\t"+line[69:74]+"\t"
-                          +line[79:83]+"\t"+line[89:93]+"\t"+line[95:100]+"\t"+line[103:108]+"\t"+line[111:116]
-                          +"\t"+line[118:123]+"\t"+line[125:130]);
-                        
-                    
-                    
+                    name = station_name.get(line[:12]).strip();
+                    file_to_write_to.write(name+"\t"+line[14:23]
+                          +"\t"+line[25:31]+"\t"+line[36:42]+"\t"+line[46:53]+"\t"+line[69:74]+"\t"
+                          +line[79:84]+"\t"+line[89:94]+"\t"+line[95:101]+"\t"+line[103:108]+"\t"+line[111:116]
+                          +"\t"+line[119:123]+"\t"+line[125:131]);
+                    file_to_write_to.write("\n");
             
             
+            file_to_write_to.flush();
+            file_to_write_to.close();
+                            
             
         except IOError:
             print("total dataset file was not found");
