@@ -120,7 +120,7 @@ class Data():
                     file_to_write_to.write(name+"\t"+line[14:23]
                           +"\t"+line[25:31]+"\t"+line[36:42]+"\t"+line[46:53]+"\t"+line[69:74]+"\t"
                           +line[79:84]+"\t"+line[89:94]+"\t"+line[95:101]+"\t"+line[103:108]+"\t"+line[111:116]
-                          +"\t"+line[119:123]+"\t"+line[125:131]);
+                          +"\t"+line[118:123]+"\t"+line[125:131]);
                     file_to_write_to.write("\n");
             
             
