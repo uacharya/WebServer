@@ -7,13 +7,13 @@ from Create_required_text_file import Data;
 
 if __name__ == '__main__':
     
-    file_path_of_total_data = "C:/Users/walluser/Total_Global_Weather_Data.txt";
+    file_path_of_total_data = "C:/Users/walluser/combined.txt";
     
-    file_path_of_country_and_station_name = "C:/Users/walluser/Global_Weather_Dataset/station_names_into_countries.txt";
+    file_path_of_country_and_station_name_with_atrributes = "C:/Users/walluser/Global_Weather_Dataset/station_names_into_countries.txt";
     
     new_object = Data();
     
-    new_object.create_only_required_data(file_path_of_total_data, file_path_of_country_and_station_name);
+    new_object.create_only_required_data(file_path_of_total_data, file_path_of_country_and_station_name_with_atrributes);
     
     
     
