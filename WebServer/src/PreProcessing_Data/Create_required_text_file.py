@@ -130,58 +130,66 @@ class Data():
             dataset_open = open(total_dataset, "r");
             total_lines = dataset_open.readlines();
             
-#             output_file = "C:/Users/walluser/preprocessed_combined.txt";
-#             file_to_write_to = open(output_file, "w");
-#             
-#             file_to_write_to.write("STATION\tYEARMODA\tTEMPERATURE\tDEW\tSEALEVELPRESSURE\tSTATIONPRESSURE\tVISIBILITY\tWINDSPEED\tMAXWINDSPEED\tWINDGUST\tMAXTEMP\tMINTEMP\tPRECIPITATION\tSNOWDEPTH");
-#             file_to_write_to.write("\n");
-            print("STATION\tYEARMODA\tTEMPERATURE\tDEW\tSEALEVELPRESSURE\tSTATIONPRESSURE\tVISIBILITY\tWINDSPEED\tMAXWINDSPEED\tWINDGUST\tMAXTEMP\tMINTEMP\tPRECIPITATION\tSNOWDEPTH");
-            print("\n");
+            output_file = "C:/Users/walluser/final_total_weather_dataset.txt";
+            file_to_write_to = open(output_file, "w");
+            
+            file_to_write_to.write("STATION\tYEARMODA\tTEMPERATURE\tDEW\tSEALEVELPRESSURE\tSTATIONPRESSURE\tDENSITY\tVISIBILITY\tWINDSPEED\tMAXWINDSPEED\tWINDGUST\tMAXTEMP\tMINTEMP\tPRECIPITATION\tSNOWDEPTH\tLATITUDE\tLONGITUDE\tELEVATION");
+            file_to_write_to.write("\n");
             for line in total_lines:
                 if(station_name.get(line[:12]) != None):
                     name = station_name.get(line[:12]).strip();
-#                     file_to_write_to.write(name + "\t" + line[14:23]
-#                           + "\t" + line[25:31] + "\t" + line[36:42] + "\t" + line[46:53] + "\t" + line[57:64] + "\t" + line[69:74] + "\t"
-#                           + line[79:84] + "\t" + line[89:94] + "\t" + line[95:101] + "\t" + line[103:108] + "\t" + line[111:116]
-#                           + "\t" + line[118:123] + "\t" + line[125:131]);
-#                     file_to_write_to.write("\n");
+
                     temperature_in_kelvin = self.convert_temperature_to_kelvin(line[25:31]);
-                    
-                    print("here is the original one"+line[57:64].strip());
-                    
-                    if(float(line[57:64])==9999.9):
-                        station_pressure = self.get_station_pressure(line[46:53],elevation.get(line[:12]),temperature_in_kelvin);
+
+                    if(float(line[57:64]) == 9999.9):
+                        station_pressure = self.get_station_pressure(line[46:53], elevation.get(line[:12]), temperature_in_kelvin);
                     else:
                         station_pressure = float(line[57:64]);
                     
-                    print station_pressure;
+                    if(station_pressure == 9999.9 or temperature_in_kelvin == 9999.9):
+                        density = 0;
+                    else:
+                        density = self.get_the_density(station_pressure, temperature_in_kelvin);
                         
-                    print(name + "\t" + line[14:23]
-                        + "\t" + str(temperature_in_kelvin) + "\t" + line[36:42] + "\t" + line[46:53] + "\t" + str(station_pressure) + "\t" + line[69:74] + "\t"
-                        + line[79:84] + "\t" + line[89:94] + "\t" + line[95:101] + "\t" + line[103:108] + "\t" + line[111:116]
-                        + "\t" + line[118:123] + "\t" + line[125:131]);
+                        
+                    file_to_write_to.write(name + "\t" + line[14:23]
+                        + "\t" + str(temperature_in_kelvin) + "\t" + line[36:42] + "\t" + line[46:53] + "\t" + str(station_pressure) + "\t" + str(density) + "\t" + line[69:74] + "\t"
+                        + str(self.convert_to_ms(line[79:84])) + "\t" + str(self.convert_to_ms(line[89:94])) + "\t" + line[95:101] + "\t" + 
+                        str(self.convert_temperature_to_kelvin(line[103:108])) + "\t" + str(self.convert_temperature_to_kelvin(line[111:116]))
+                        + "\t" + line[118:123] + "\t" + line[125:131] + "\t" + latitude.get(line[:12]) + "\t" + longitude.get(line[:12]) + "\t" + elevation.get(line[:12]));
 
-            # station pressure temperature latitude longitude elevation is all done just add them and use ideal gas law to find the density
-#             
-#             file_to_write_to.flush();
-#             file_to_write_to.close();
+
+            file_to_write_to.flush();
+            file_to_write_to.close();
                             
             
         except IOError:
             print("total dataset file was not found");
             
+    
+    def get_the_density(self, pressure, temperature):
+        return pressure / (287.058 * temperature);
+        
+            
+    def convert_to_ms(self, wind_speed):
+        if(float(wind_speed) == 999.9):
+            return float(999.9)
+        else:
+            return float(wind_speed) * 0.514444;
+        
         
     def convert_temperature_to_kelvin(self, temperature_in_farheheit):
         if(float(temperature_in_farheheit) == 9999.9):
-            return 9999.9
+            return float(9999.9);
         else:
             return ((float(temperature_in_farheheit) - 32) * (float(5) / float(9))) + 273.15;
         
-    def get_station_pressure(self,sea_level_pressure,elevation,temperature):
-        if(float(sea_level_pressure)==9999.9):
-            return 9999.9
+    def get_station_pressure(self, sea_level_pressure, elevation, temperature):
+        
+        if(float(sea_level_pressure) == 9999.9 or not elevation.strip() or temperature==9999.9):
+            return float(9999.9);
         else:
-            exponent = float(elevation)/float(temperature*29.263)
+            exponent = float(elevation) / float(temperature * 29.263)
             return float(sea_level_pressure) * math.exp(-exponent);
     
             
@@ -197,46 +205,7 @@ if __name__ == '__main__':
     
     create_usable_stations_list.create_only_stations_name(file_path_stations, countries_name);
     
-#                     total_fields = total_lines[counter].split(" ");
-#                     print(total_fields);
-#                     for index in range(len(total_fields)):
-#                         if(countries_name.get(total_fields[index]) != None):
-# #                             print(total_fields[index]);
-#                             station_id = total_fields[0] + " " + total_fields[1];
-#                             value = countries_name.get(total_fields[index]).strip() + ",";
-#                      
-#                             for station_index in range(index):
-#                                 if(station_index > 1 and station_index < index and total_fields[station_index] != ""):
-#                                     value = value + total_fields[station_index] + " ";
-#                               
-#                             position = 0; 
-#                                 
-#                             for contents in range(index + 1, len(total_fields)):
-#                                 if "+" in total_fields[contents]:
-# #                                     print(total_fields[contents]);
-#                                     if(position == 0):
-#                                         station_latitiude[station_id] = total_fields[contents];
-#                                         position += 1;
-#                                     elif(position == 1):
-#                                         station_longitude[station_id] = total_fields[contents];
-#                                         position += 1;
-#                                     elif(position == 2):
-#                                         station_elevation[station_id] = total_fields[contents];
-#                                         position += 1;
-#                                     
-#                                 elif "-" in total_fields[contents]:
-# #                                     print(total_fields[contents]);
-#                                     if(position == 0):
-#                                         station_latitiude[station_id] = total_fields[contents];
-#                                         position += 1;
-#                                     elif(position == 1):
-#                                         station_longitude[station_id] = total_fields[contents];
-#                                         position += 1;
-#                                     elif(position == 2):
-#                                         station_elevation[station_id] = total_fields[contents];
-#                                         position += 1;
-#                            
-#                             station_id_into_country_name[station_id] = value;
+
      
     
     
