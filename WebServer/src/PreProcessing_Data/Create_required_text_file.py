@@ -130,7 +130,7 @@ class Data():
             dataset_open = open(total_dataset, "r");
             total_lines = dataset_open.readlines();
             
-            output_file = "C:/Users/walluser/final_total_weather_dataset.txt";
+            output_file = "C:/Users/walluser/final_total_weather_dataset_preprocessed.txt";
             file_to_write_to = open(output_file, "w");
             
             file_to_write_to.write("STATION\tYEARMODA\tTEMPERATURE\tDEW\tSEALEVELPRESSURE\tSTATIONPRESSURE\tDENSITY\tVISIBILITY\tWINDSPEED\tMAXWINDSPEED\tWINDGUST\tMAXTEMP\tMINTEMP\tPRECIPITATION\tSNOWDEPTH\tLATITUDE\tLONGITUDE\tELEVATION");
@@ -142,18 +142,20 @@ class Data():
                     temperature_in_kelvin = self.convert_temperature_to_kelvin(line[25:31]);
 
                     if(float(line[57:64]) == 9999.9):
-                        station_pressure = self.get_station_pressure(line[46:53], elevation.get(line[:12]), temperature_in_kelvin);
+                        station_pressure = self.get_station_pressure(line[46:53], elevation.get(line[:12]), temperature_in_kelvin)*100;
                     else:
-                        station_pressure = float(line[57:64]);
+                        station_pressure = float(line[57:64])*100;
                     
                     if(station_pressure == 9999.9 or temperature_in_kelvin == 9999.9):
                         density = 0;
                     else:
                         density = self.get_the_density(station_pressure, temperature_in_kelvin);
                         
+                    sea_level_pressure_in_pascals = float(line[46:53])*100;
+                        
                         
                     file_to_write_to.write(name + "\t" + line[14:23]
-                        + "\t" + str(temperature_in_kelvin) + "\t" + line[36:42] + "\t" + line[46:53] + "\t" + str(station_pressure) + "\t" + str(density) + "\t" + line[69:74] + "\t"
+                        + "\t" + str(temperature_in_kelvin) + "\t" + line[36:42] + "\t" + str(sea_level_pressure_in_pascals) + "\t" + str(station_pressure) + "\t" + str(density) + "\t" + line[69:74] + "\t"
                         + str(self.convert_to_ms(line[79:84])) + "\t" + str(self.convert_to_ms(line[89:94])) + "\t" + line[95:101] + "\t" + 
                         str(self.convert_temperature_to_kelvin(line[103:108])) + "\t" + str(self.convert_temperature_to_kelvin(line[111:116]))
                         + "\t" + line[118:123] + "\t" + line[125:131] + "\t" + latitude.get(line[:12]) + "\t" + longitude.get(line[:12]) + "\t" + elevation.get(line[:12]));

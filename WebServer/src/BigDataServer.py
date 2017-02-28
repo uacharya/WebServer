@@ -10,14 +10,14 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 class customHTTPRequestHandler(BaseHTTPRequestHandler):
     # method for handling the http request from the client
     def do_GET(self):
-        output_directory = "//WALL3/Users/walluser/javaWorkspace/D3EventServer/D3/WebContent";
+        output_directory = "/Users/Uzwal/Documents/workspace/bilevel/WebContent";
         try:
             #printing headers of connection made
             print(self.headers);
             file_to_send = open(output_directory + self.path, "r");  # opening the file to send
             #send a connection was made response code
             self.send_response(200,"ok");
-            self.send_header("Access-Control-Allow-Origin","file://");
+            self.send_header("Access-Control-Allow-Origin","null");
             self.end_headers();
             # sending file to client via output stream
             self.wfile.write(file_to_send.read()) 
@@ -31,7 +31,7 @@ class customHTTPRequestHandler(BaseHTTPRequestHandler):
 
 def runServer():
     try:
-        server_address = ("192.168.10.3", 8085);
+        server_address = ("127.0.0.1", 8085);
         httpServer = HTTPServer(server_address, customHTTPRequestHandler);
         print("web server is running");
         httpServer.serve_forever();     
