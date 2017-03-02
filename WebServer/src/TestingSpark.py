@@ -7,10 +7,6 @@ Created on Mar 10, 2016
 from pyspark import SparkConf, SparkContext;
 
 
-
-
-
-
 def create_required_datewise_data(line):
     
     data = line.split("\t");
@@ -34,42 +30,29 @@ if __name__ == '__main__':
     sc = SparkContext(conf=sparkConf);
     
     distributed_dataset = sc.textFile("/Users/Uzwal/Desktop/preprocessed_combined.txt");
-    
+    #getting the header of the whole dataset
     header = distributed_dataset.first();
-    
+      
     distributed_dataset = distributed_dataset.filter(lambda d: d!=header);
-    
+     
     data_in_required_format = distributed_dataset.map(create_required_datewise_data);
-    
-#     data_in_required_format.persist();
-     
+  
     broadcast_data = data_in_required_format.collect();
-     
+      
     broadcast_variable = sc.broadcast(broadcast_data);
-     
-    hash_partitions = data_in_required_format.partitionBy(4);
-     
-    output = hash_partitions.mapPartitionsWithIndex(collecting_data).collect();
     
-    print("i am the size"+str(len(output)));
-    
-    for item in output:
-        print(item);
-    
+    output = data_in_required_format.collect();
      
+#     for item in output:
+#         print(item);
+     
+      
     print("the keys are" + str(data_in_required_format.getNumPartitions()));
+     
+    print(broadcast_variable.value);
     
-    print(broadcast_variable.value[1]);
-    
-    
-    
-    
-    
-    
-#     for line in collected_data:
-#         print(line + "\t" + str(collected_data[line]));
-    
-    
+    #erasing the broadcast data set after use from everywhere
+    broadcast_variable.unpersist(blocking=True); 
     
     sc.stop();
 
