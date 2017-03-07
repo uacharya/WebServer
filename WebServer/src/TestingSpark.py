@@ -5,7 +5,6 @@ Created on Mar 10, 2016
 '''
 
 from pyspark import SparkConf, SparkContext;
-import os;
 import math;
 
 # splits the line into individual dimension and creates a dictionary with key value pair 
@@ -15,7 +14,7 @@ def create_required_datewise_data(line):
     data = line.split("\t");
     
     key = str(data[1]);
-    
+ 
     data_features = {"Date":key, "Station_Name":str(data[0]), "Temperature":str(data[2]), "Station_Pressure":str(data[5]), "Station_Density":str(data[6]), "Station_Wind_Velocity":str(data[8]),
                        "Station_Latitude":str(data[15]), "Station_Longitude":str(data[16]), "Station_Elevation":str(data[17])};
     
@@ -44,12 +43,11 @@ def compare_data_between(first_station, second_station):
         first_station_wind_velocity = float(first_station["Station_Wind_Velocity"]);
         second_station_wind_velocity = float(second_station["Station_Wind_Velocity"]);
         
-        destination_wind_velocity = 0;
-        
         first_station_air_density = float(first_station["Station_Density"]);
         second_station_air_density = float(second_station["Station_Density"]);
         
         if(first_station_pressure > second_station_pressure):
+            # getting the final destination wind velocity using bernoulli principle
             temp_value = 2 * (((first_station_pressure / first_station_air_density) - (second_station_pressure / second_station_air_density)) + 
                                         (717 * (float(first_station["Temperature"]) - float(second_station["Temperature"]))) + 
                                         (9.8 * (float(first_station["Station_Elevation"]) - float(second_station["Station_Elevation"]))) + 
@@ -60,8 +58,10 @@ def compare_data_between(first_station, second_station):
             
             wind_flow_acceleration = get_acceleration_for_wind_flow(first_station, second_station);
             time_required_to_reach_destination_in_seconds = (destination_wind_velocity - first_station_wind_velocity) / wind_flow_acceleration;
-            create_simulation_data(first_station,second_station,wind_flow_acceleration,time_required_to_reach_destination_in_seconds);
+            create_simulation_data(first_station, second_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds);
+            
         else:
+            # getting the final destination wind velocity using bernoulli principle
             temp_value = 2 * (((second_station_pressure / second_station_air_density) - (first_station_pressure / first_station_air_density)) + 
                                         (717 * (float(second_station["Temperature"]) - float(first_station["Temperature"]))) + 
                                         (9.8 * (float(second_station["Station_Elevation"]) - float(first_station["Station_Elevation"]))) + 
@@ -69,16 +69,14 @@ def compare_data_between(first_station, second_station):
         
             
             destination_wind_velocity = math.sqrt(temp_value);
+            
             wind_flow_acceleration = get_acceleration_for_wind_flow(second_station, first_station);
             time_required_to_reach_destination_in_seconds = (destination_wind_velocity - second_station_wind_velocity) / wind_flow_acceleration;
-            create_simulation_data(second_station,first_station,wind_flow_acceleration,time_required_to_reach_destination_in_seconds);
+            create_simulation_data(second_station, first_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds);
            
     else:
         return;
     
-def create_simulation_data(source_station,destination_station,acceleration,time_to_reach):
-    pass;
-
 
 # this function calculates the acceleration of the wind flow from one station to another based on pressure difference        
 def get_acceleration_for_wind_flow(source, destination):
@@ -99,16 +97,43 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     distance = math.acos(distance) * (180 / math.pi);
     # distance in kilometers
     final_distance = distance * 60 * 1.1515 * 1.609344;
-    
+    # return distance in meters
     return final_distance * 1000;
+
+
+def create_simulation_data(source_station, destination_station, acceleration, time_to_reach):
+   
+    initial_wind_velocity = last_wind_velocity = float(source_station["Station_Wind_Velocity"]);
+    last_wind_location = (float(source_station["Station_Latitude"]), float(source_station["Station_Longitude"]));
+    
+    station_id = source_station["Station_Name"];
+    total_time = math.ceil(time_to_reach);
+    counter = 0;
+    
+    while counter <= total_time:
+        write_to_csv_data(station_id, last_wind_location, last_wind_velocity);
+        counter += 1;
+        
+        if(counter <= total_time): 
+            last_wind_location = find_new_wind_location(last_wind_location,last_wind_velocity,counter);
+            last_wind_velocity = find_new_wind_velocity(initial_wind_velocity, acceleration, counter);
+        
+        
     
     
-    
+def find_new_wind_velocity(v0, a, t):
+    return v0 + (a * t)
+
+def find_new_wind_location(last_location,):
+    pass;
+
+def write_to_csv_data(id,coordinates,velocity):
+    pass;
             
 if __name__ == '__main__':
     
     # configure the spark environment
-    sparkConf = SparkConf().setAppName("Creating Data").setMaster("local[*]");
+    sparkConf = SparkConf().setAppName("Creating Data");
     sc = SparkContext(conf=sparkConf);
     
     distributed_dataset = sc.textFile("file:///Users/walluser/Desktop/preprocessed_combined.txt");
