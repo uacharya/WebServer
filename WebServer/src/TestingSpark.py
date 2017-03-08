@@ -57,7 +57,7 @@ def compare_data_between(first_station, second_station):
             destination_wind_velocity = math.sqrt(temp_value);
             
             wind_flow_acceleration = get_acceleration_for_wind_flow(first_station, second_station);
-            time_required_to_reach_destination_in_seconds = (destination_wind_velocity - first_station_wind_velocity) / wind_flow_acceleration;
+            time_required_to_reach_destination_in_seconds = (destination_wind_velocity - first_station_wind_velocity) / wind_flow_acceleration[0];
             create_simulation_data(first_station, second_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds);
             
         else:
@@ -71,7 +71,7 @@ def compare_data_between(first_station, second_station):
             destination_wind_velocity = math.sqrt(temp_value);
             
             wind_flow_acceleration = get_acceleration_for_wind_flow(second_station, first_station);
-            time_required_to_reach_destination_in_seconds = (destination_wind_velocity - second_station_wind_velocity) / wind_flow_acceleration;
+            time_required_to_reach_destination_in_seconds = (destination_wind_velocity - second_station_wind_velocity) / wind_flow_acceleration[0];
             create_simulation_data(second_station, first_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds);
            
     else:
@@ -84,50 +84,93 @@ def get_acceleration_for_wind_flow(source, destination):
     average_density = (float(source["Station_Density"]) + float(destination["Station_Density"])) / 2;
     pressure_difference = float(source["Station_Pressure"]) - float(destination["Station_Pressure"]);
     # acceleration of a wind flow from source to destination
-    acceleration = (1 / average_density) * (pressure_difference / distance_betweem_two_stations);
+    acceleration = (1 / average_density) * (pressure_difference / distance_betweem_two_stations[1]);
     
-    return acceleration; 
+    return (acceleration,distance_betweem_two_stations[0]); 
     
-# this function calculates distance between two points in earth based on their lat and lon
+# this function calculates distance between two points in earth based on their lat and lon using great circle formula os sphere
 def calculate_distance(lat1, lon1, lat2, lon2):
+    R = 6371000;  # meters the radius of earth
     rad_lat1 = math.pi * lat1 / 180;
     rad_lat2 = math.pi * lat2 / 180;
-    rad_theta = math.pi * (lon1 - lon2) / 180;
-    distance = math.sin(rad_lat1) * math.sin(rad_lat2) + math.cos(rad_lat1) * math.cos(rad_lat2) * math.cos(rad_theta);
-    distance = math.acos(distance) * (180 / math.pi);
-    # distance in kilometers
-    final_distance = distance * 60 * 1.1515 * 1.609344;
-    # return distance in meters
-    return final_distance * 1000;
-
+    rad_diff_lat = math.pi * (lat2 - lat1) / 180;
+    rad_diff_lon = math.pi * (lon2 - lon1) / 180;
+    a = math.sin(rad_diff_lat / 2) ** 2 + math.cos(rad_lat1) * math.cos(rad_lat2) * (math.sin(rad_diff_lon / 2) ** 2);
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    # distance between the two points in meters
+    return (c, R * c);
+    
 
 def create_simulation_data(source_station, destination_station, acceleration, time_to_reach):
    
     initial_wind_velocity = last_wind_velocity = float(source_station["Station_Wind_Velocity"]);
-    last_wind_location = (float(source_station["Station_Latitude"]), float(source_station["Station_Longitude"]));
-    
     station_id = source_station["Station_Name"];
+    
     total_time = math.ceil(time_to_reach);
     counter = 0;
+    #getting all the locations that are in between source and destination wind flow
+    intermediate_locations = get_intermediate_wind_locations(source_station, destination_station,acceleration[1],total_time);
+    # writing first data so that first line starts from center of the source station
+    write_to_csv_data(station_id,intermediate_locations[0],initial_wind_velocity);
     
     while counter <= total_time:
-        write_to_csv_data(station_id, last_wind_location, last_wind_velocity);
+        # finding the wind location after coriolis deflection for each point in the route
+        actual_wind_location = find_new_wind_location(last_wind_velocity, counter,intermediate_locations);
+        # writing the data to the file after finding the required attributes for a particular wind flow line
+        write_to_csv_data(station_id, actual_wind_location, last_wind_velocity);
         counter += 1;
-        
+        # calculating the new velocity for each intervals in between until the wind reaches the destination
         if(counter <= total_time): 
-            last_wind_location = find_new_wind_location(last_wind_location,last_wind_velocity,counter);
-            last_wind_velocity = find_new_wind_velocity(initial_wind_velocity, acceleration, counter);
-        
-        
-    
-    
+            last_wind_velocity = find_new_wind_velocity(initial_wind_velocity, acceleration[0], counter);
+            
+#this function finds the velocity value for a particular location of a wind flow based on time that the wind started to flow from the sources            
 def find_new_wind_velocity(v0, a, t):
     return v0 + (a * t)
+            
+#this function produces all the locations that lies in the arc distance i.e. distance between two lines on earth based on great circle distance
+def get_intermediate_wind_locations(source,destination,distance_in_radians,total_time):
+    
+    initial_wind_location = [float(source["Station_Latitude"]), float(source["Station_Longitude"])];
+    final_wind_location =[float(destination["Station_Latitude"]), float(destination["Station_Longitude"])];
+    #list that stores coordinates of all the locations that is supposed to be visualized as line for wind flow
+    intermediate_locations=[];
+    intermediate_locations.append(initial_wind_location);
+    #converting every single degree value into radian for calculations
+    lat1_radians = math.radians(initial_wind_location[0]);
+    lat2_radians = math.radians(final_wind_location[0]);
+    lon1_radians = math.radians(initial_wind_location[1]);
+    lon2_radians = math.radians(final_wind_location[1]);
+    
+    for counter in range(1,total_time):
+        #fractions along the route from source to destination based on time intervals where velocity is measured
+        f = float(counter)/float(total_time);
+        a = math.sin((1-f)*distance_in_radians)/math.sin(distance_in_radians);
+        b = math.sin(f*distance_in_radians)/math.sin(distance_in_radians);
+        x = a*math.cos(lat1_radians)*math.cos(lon1_radians)+b*math.cos(lat2_radians)*math.cos(lon2_radians);
+        y = a*math.cos(lat1_radians)*math.sin(lon1_radians)+b*math.cos(lat2_radians)*math.sin(lon2_radians);
+        z = a*math.sin(lat1_radians)+b*math.sin(lat2_radians);
+        
+        final_lat = math.atan2(z, math.sqrt(x**2+y**2));
+        final_lon = math.atan2(y, x);
+        location_coordinate = [math.degrees(final_lat),math.degrees(final_lon)]
+        intermediate_locations.append(location_coordinate);
+        
+    intermediate_locations.append(final_wind_location);
+    
+    return intermediate_locations;
+        
 
-def find_new_wind_location(last_location,):
+#this function gives actual location coordinate after coriolis deflection takes place
+def find_new_wind_location(velocity, counter,list_of_locations):
     pass;
 
-def write_to_csv_data(id,coordinates,velocity):
+
+
+
+
+
+
+def write_to_csv_data(key, coordinates, velocity):
     pass;
             
 if __name__ == '__main__':
