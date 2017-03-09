@@ -6,6 +6,7 @@ Created on Mar 10, 2016
 
 from pyspark import SparkConf, SparkContext;
 import math;
+import os;
 
 # splits the line into individual dimension and creates a dictionary with key value pair 
 # with key being the date and value being the station's weather variable
@@ -14,7 +15,7 @@ def create_required_datewise_data(line):
     data = line.split("\t");
     
     key = str(data[1]);
- 
+     
     data_features = {"Date":key, "Station_Name":str(data[0]), "Temperature":str(data[2]), "Station_Pressure":str(data[5]), "Station_Density":str(data[6]), "Station_Wind_Velocity":str(data[8]),
                        "Station_Latitude":str(data[15]), "Station_Longitude":str(data[16]), "Station_Elevation":str(data[17])};
     
@@ -23,10 +24,18 @@ def create_required_datewise_data(line):
 
 # this function creates the data analyzing the two stations in comparison
 def create_data_from_station_data(first, second):
-    date_for_comparision = first["Date"];
+    date_for_comparision = first["Date"].strip();
     
+    #creating directory for each date
+    if not os.path.exists("/Users/walluser/Desktop/dataset/"+date_for_comparision):
+        os.mkdir("/Users/walluser/Desktop/dataset/"+date_for_comparision);
+        #directory to hold dataset in csv file for reach node in wall display starting from 1 to 9    
+        for index in range(1,10):
+            os.mkdir("/Users/walluser/Desktop/dataset/"+date_for_comparision+"/node"+str(index));
+    
+        
     for data in broadcast_variable.value:
-        if data[0] == date_for_comparision:
+        if data[0].strip() == date_for_comparision:
             compare_data_between(first, data[1]);
         else:
             continue;
@@ -52,8 +61,6 @@ def compare_data_between(first_station, second_station):
                                         (717 * (float(first_station["Temperature"]) - float(second_station["Temperature"]))) + 
                                         (9.8 * (float(first_station["Station_Elevation"]) - float(second_station["Station_Elevation"]))) + 
                                         + (0.5 * (first_station_wind_velocity * first_station_wind_velocity)));
-        
-            
             destination_wind_velocity = math.sqrt(temp_value);
             
             wind_flow_acceleration = get_acceleration_for_wind_flow(first_station, second_station);
@@ -67,7 +74,6 @@ def compare_data_between(first_station, second_station):
                                         (9.8 * (float(second_station["Station_Elevation"]) - float(first_station["Station_Elevation"]))) + 
                                         + (0.5 * (second_station_wind_velocity * second_station_wind_velocity)));
         
-            
             destination_wind_velocity = math.sqrt(temp_value);
             
             wind_flow_acceleration = get_acceleration_for_wind_flow(second_station, first_station);
@@ -106,22 +112,23 @@ def create_simulation_data(source_station, destination_station, acceleration, ti
     initial_wind_velocity = last_wind_velocity = float(source_station["Station_Wind_Velocity"]);
     station_id = source_station["Station_Name"];
     
-    total_time = math.ceil(time_to_reach);
-    counter = 0;
+    total_time = int(math.ceil(time_to_reach));
+    counter = 1;
     #getting all the locations that are in between source and destination wind flow
     intermediate_locations = get_intermediate_wind_locations(source_station, destination_station,acceleration[1],total_time);
     # writing first data so that first line starts from center of the source station
     write_to_csv_data(station_id,intermediate_locations[0],initial_wind_velocity);
     
     while counter <= total_time:
+        # calculating the new velocity for each intervals in between until the wind reaches the destination
+        last_wind_velocity = find_new_wind_velocity(initial_wind_velocity, acceleration[0], counter);
         # finding the wind location after coriolis deflection for each point in the route
         actual_wind_location = find_new_wind_location(last_wind_velocity, counter,intermediate_locations);
         # writing the data to the file after finding the required attributes for a particular wind flow line
         write_to_csv_data(station_id, actual_wind_location, last_wind_velocity);
         counter += 1;
-        # calculating the new velocity for each intervals in between until the wind reaches the destination
-        if(counter <= total_time): 
-            last_wind_velocity = find_new_wind_velocity(initial_wind_velocity, acceleration[0], counter);
+    
+    write_to_csv_data(station_id,intermediate_locations[len(intermediate_locations)-1],initial_wind_velocity);
             
 #this function finds the velocity value for a particular location of a wind flow based on time that the wind started to flow from the sources            
 def find_new_wind_velocity(v0, a, t):
@@ -162,14 +169,22 @@ def get_intermediate_wind_locations(source,destination,distance_in_radians,total
 
 #this function gives actual location coordinate after coriolis deflection takes place
 def find_new_wind_location(velocity, counter,list_of_locations):
-    pass;
-
-
-
-
-
-
-
+    current_location = list_of_locations[counter];
+    current_latitute = math.radians(current_location[0]);
+    #total distance for one degree longitude in that latitude
+    distance_for_one_degree_longitude = 111111* math.cos(current_latitute);
+    
+    coriolis_acceleration = 2 * velocity * ((2*math.pi)/86400) * math.sin(current_latitute);
+    #gives distance displaced in meters
+    distance_displaced_due_to_coriolis = 0.5 * coriolis_acceleration * (counter**2);
+    #total degrees of deflection
+    total_deflection_in_degree_of_longitude = float(distance_displaced_due_to_coriolis)/float(distance_for_one_degree_longitude);
+    
+    new_lon = float(current_latitute[1])-total_deflection_in_degree_of_longitude;
+    #returning deflected new coordinate of the location
+    return [current_location[0],new_lon];
+    
+#this function writes the data to each csv file for each node of wall display    
 def write_to_csv_data(key, coordinates, velocity):
     pass;
             
@@ -194,6 +209,8 @@ if __name__ == '__main__':
         
     # analyzing the stations weather variables based on each date to create the simulation data for wind flow      
     final_data_after_creating_files = data_in_required_format.reduceByKey(create_data_from_station_data);
+    
+    final_data_after_creating_files.count();
          
     # erasing the broadcast data set after use from everywhere
     broadcast_variable.unpersist(blocking=True); 
