@@ -32,6 +32,9 @@ def create_data_from_station_data(first, second):
         # directory to hold dataset in csv file for reach node in wall display starting from 1 to 9    
         for index in range(1, 10):
             os.mkdir("/Users/walluser/Desktop/dataset/" + date_for_comparision + "/node" + str(index));
+            file_write = open("/Users/walluser/Desktop/dataset/" + date_for_comparision + "/node" + str(index)+"/data.csv","w+");
+            file_write.write("Date,ID,Source,Destination,S_Lat,S_Lon,D_Lat,D_Lon,Wind_Lat,Wind_Lon,Wind_Velocity\n");
+            file_write.close();
         
     for data in broadcast_variable.value:
         if data[0].strip() == date_for_comparision:
@@ -62,8 +65,7 @@ def compare_data_between(date, first_station, second_station):
                                         (717 * (float(first_station["Temperature"]) - float(second_station["Temperature"]))) + 
                                         (9.8 * (float(first_station["Station_Elevation"]) - float(second_station["Station_Elevation"]))) + 
                                         + (0.5 * (first_station_wind_velocity * first_station_wind_velocity)));
-            temp_value = abs(temp_value);
-            destination_wind_velocity = math.sqrt(temp_value);
+            destination_wind_velocity = math.sqrt(abs(temp_value));
             
             wind_flow_acceleration = get_acceleration_for_wind_flow(first_station, second_station);
             time_required_to_reach_destination_in_seconds = (destination_wind_velocity - first_station_wind_velocity) / wind_flow_acceleration[0];
@@ -75,9 +77,8 @@ def compare_data_between(date, first_station, second_station):
                                         (717 * (float(second_station["Temperature"]) - float(first_station["Temperature"]))) + 
                                         (9.8 * (float(second_station["Station_Elevation"]) - float(first_station["Station_Elevation"]))) + 
                                         + (0.5 * (second_station_wind_velocity * second_station_wind_velocity)));
-            temp_value = abs(temp_value);
-        
-            destination_wind_velocity = math.sqrt(temp_value);
+                                                                    
+            destination_wind_velocity = math.sqrt(abs(temp_value));
             
             wind_flow_acceleration = get_acceleration_for_wind_flow(second_station, first_station);
             time_required_to_reach_destination_in_seconds = (destination_wind_velocity - second_station_wind_velocity) / wind_flow_acceleration[0];
@@ -113,14 +114,16 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 def create_simulation_data(date, source_station, destination_station, acceleration, time_to_reach):
    
     initial_wind_velocity = last_wind_velocity = float(source_station["Station_Wind_Velocity"]);
-    station_id = source_station["Station_Name"] + "_to_" + destination_station["Station_Name"];
+    source_id = source_station["Station_Name"].replace(" ","_").replace("(","").replace(")","");
+    destination_id = destination_station["Station_Name"].replace(" ","_").replace("(","").replace(")","");
+    ID = source_id+"_to_"+destination_id;
     
     total_time = int(math.ceil(time_to_reach));
     counter = 1;
     # getting all the locations that are in between source and destination wind flow
     intermediate_locations = get_intermediate_wind_locations(source_station, destination_station, acceleration[1], total_time);
     # writing first data so that first line starts from center of the source station
-    write_to_csv_data(date, station_id, intermediate_locations[0], initial_wind_velocity);
+    write_to_csv_data(date,ID,source_id,destination_id,source_station["Station_Latitude"], source_station["Station_Longitude"], destination_station["Station_Latitude"],destination_station["Station_Longitude"],intermediate_locations[0], initial_wind_velocity);
     
     while counter <= total_time:
         # calculating the new velocity for each intervals in between until the wind reaches the destination
@@ -128,10 +131,10 @@ def create_simulation_data(date, source_station, destination_station, accelerati
         # finding the wind location after coriolis deflection for each point in the route
         actual_wind_location = find_new_wind_location(last_wind_velocity, counter, intermediate_locations);
         # writing the data to the file after finding the required attributes for a particular wind flow line
-        write_to_csv_data(date, station_id, actual_wind_location, last_wind_velocity);
+        write_to_csv_data(date,ID, source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], actual_wind_location, last_wind_velocity);
         counter += 1;
     
-    write_to_csv_data(date,station_id, intermediate_locations[len(intermediate_locations) - 1], initial_wind_velocity);
+    write_to_csv_data(date,ID,source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], intermediate_locations[len(intermediate_locations) - 1], initial_wind_velocity);
             
 # this function finds the velocity value for a particular location of a wind flow based on time that the wind started to flow from the sources            
 def find_new_wind_velocity(v0, a, t):
@@ -188,38 +191,47 @@ def find_new_wind_location(velocity, counter, list_of_locations):
     return [current_location[0], new_lon];
     
 # this function writes the data to each csv file for each node of wall display    
-def write_to_csv_data(date, key, coordinates, velocity):
+def write_to_csv_data(date,ID, source_id,destination_id,source_lat,source_lon,destination_lat,destination_lon, coordinates, velocity):
     which_node_does_location_belong_to = find_node_location(coordinates);
     
     if (which_node_does_location_belong_to=="Node_1"):
         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node1/data.csv","a+");
-        file_to_write.write(date+","+key+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.write(date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_2"):
         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node2/data.csv","a+");
-        file_to_write.write(date+","+key+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.write(date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_3"):
         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node3/data.csv","a+");
-        file_to_write.write(date+","+key+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.write(date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_4"):
         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node4/data.csv","a+");
-        file_to_write.write(date+","+key+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.write(date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_5"):
         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node5/data.csv","a+");
-        file_to_write.write(date+","+key+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.write(date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_6"):
         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node6/data.csv","a+");
-        file_to_write.write(date+","+key+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.write(date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_7"):
         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node7/data.csv","a+");
-        file_to_write.write(date+","+key+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.write(date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_8"):
         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node8/data.csv","a+");
-        file_to_write.write(date+","+key+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.write(date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_9"):
         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node9/data.csv","a+");
-        file_to_write.write(date+","+key+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.write(date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n");
+        file_to_write.close();
         
-# this function returns a location where the wind line belongs to among all of the monitors
+# this function returns a location where the wind line belongs to among all of the monitors based on mercator projection
 def find_node_location(coordinates):
     latitude = coordinates[0];
     longitude = coordinates[1];
@@ -257,12 +269,20 @@ if __name__ == '__main__':
     distributed_dataset = distributed_dataset.filter(lambda d: d != header);
     # mapping the data to prepare for processing
     data_in_required_format = distributed_dataset.map(create_required_datewise_data);
-  
+    
+    temp = set(data_in_required_format.keys().collect());
+    
+    sorted_keys = sorted(temp,key=int);
+    
+    write_keys = open("/Users/walluser/Desktop/keys.txt","w+");
+    write_keys.write(str(sorted_keys));
+    write_keys.close();
+    
     broadcast_data = data_in_required_format.collect();
       
     broadcast_variable = sc.broadcast(broadcast_data);
     
-        
+
     # analyzing the stations weather variables based on each date to create the simulation data for wind flow      
     final_data_after_creating_files = data_in_required_format.reduceByKey(create_data_from_station_data);
     
