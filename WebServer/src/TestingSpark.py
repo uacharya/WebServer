@@ -36,6 +36,14 @@ def create_data_from_station_data(first, second):
             file_write.write("Date,ID,Source,Destination,S_Lat,S_Lon,D_Lat,D_Lon,Wind_Lat,Wind_Lon,Wind_Velocity\n");
             file_write.close();
         
+    if not os.path.exists("/Users/walluser/Desktop/dataset/dataChecker"):
+        os.mkdir("/Users/walluser/Desktop/dataset/dataChecker");
+    if not os.path.exists("/Users/walluser/Desktop/dataset/dataChecker/"+date_for_comparision):
+        os.mkdir("/Users/walluser/Desktop/dataset/dataChecker/"+date_for_comparision)  
+         
+    file_write = open("/Users/walluser/Desktop/dataset/dataChecker/" + date_for_comparision +"/check.txt","a+");
+    file_write.close();
+        
     for data in broadcast_variable.value:
         if data[0].strip() == date_for_comparision:
             compare_data_between(date_for_comparision, first, data[1]);
@@ -47,7 +55,7 @@ def create_data_from_station_data(first, second):
 
 # this function does the detailed comparing of a pair of stations using equations of physics to create wind flow simulation
 def compare_data_between(date, first_station, second_station):
-  
+    
     if first_station != second_station:
         first_station_pressure = float(first_station["Station_Pressure"]);
         second_station_pressure = float(second_station["Station_Pressure"]);
@@ -60,6 +68,17 @@ def compare_data_between(date, first_station, second_station):
         
         
         if(first_station_pressure > second_station_pressure):
+            source_id = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(";","").replace(",","").replace("(","").replace(")","");
+            destination_id = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(";","").replace(",","").replace("(","").replace(")","");
+            ID = source_id+"_to_"+destination_id;
+            #checking if the data for particular pair has already been written
+            if ID in open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt").read():
+                return;
+            else:
+                file_write = open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt","a+");
+                file_write.write(ID+",");
+                file_write.close();
+            
             # getting the final destination wind velocity using bernoulli principle
             temp_value = 2 * (((first_station_pressure / first_station_air_density) - (second_station_pressure / second_station_air_density)) + 
                                         (717 * (float(first_station["Temperature"]) - float(second_station["Temperature"]))) + 
@@ -69,9 +88,20 @@ def compare_data_between(date, first_station, second_station):
             
             wind_flow_acceleration = get_acceleration_for_wind_flow(first_station, second_station);
             time_required_to_reach_destination_in_seconds = (destination_wind_velocity - first_station_wind_velocity) / wind_flow_acceleration[0];
-            create_simulation_data(date, first_station, second_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds);
+            create_simulation_data(date,ID,source_id,destination_id, first_station, second_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds,destination_wind_velocity);
             
-        else:
+        elif second_station_pressure>first_station_pressure:
+            source_id = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(";","").replace(",","").replace("(","").replace(")","");
+            destination_id = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(";","").replace(",","").replace("(","").replace(")","");
+            ID = source_id+"_to_"+destination_id;
+            #checking if the data for particular pair has already been written
+            if ID in open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt").read():
+                return;
+            else:
+                file_write = open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt","a+");
+                file_write.write(ID+",");
+                file_write.close();
+            
             # getting the final destination wind velocity using bernoulli principle
             temp_value = 2 * (((second_station_pressure / second_station_air_density) - (first_station_pressure / first_station_air_density)) + 
                                         (717 * (float(second_station["Temperature"]) - float(first_station["Temperature"]))) + 
@@ -82,7 +112,7 @@ def compare_data_between(date, first_station, second_station):
             
             wind_flow_acceleration = get_acceleration_for_wind_flow(second_station, first_station);
             time_required_to_reach_destination_in_seconds = (destination_wind_velocity - second_station_wind_velocity) / wind_flow_acceleration[0];
-            create_simulation_data(date, second_station, first_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds);
+            create_simulation_data(date,ID,source_id,destination_id, second_station, first_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds,destination_wind_velocity);
            
     else:
         return;
@@ -111,14 +141,10 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return (c, R * c);
     
 
-def create_simulation_data(date, source_station, destination_station, acceleration, time_to_reach):
+def create_simulation_data(date,ID,source_id,destination_id, source_station, destination_station, acceleration, time_to_reach,final_velocity):
    
     initial_wind_velocity = last_wind_velocity = float(source_station["Station_Wind_Velocity"]);
-    source_id = source_station["Station_Name"].replace(" ","_").replace("(","").replace(")","");
-    destination_id = destination_station["Station_Name"].replace(" ","_").replace("(","").replace(")","");
-    ID = source_id+"_to_"+destination_id;
-    
-    total_time = int(math.ceil(time_to_reach));
+    total_time = int(math.ceil(time_to_reach/480));
     counter = 1;
     # getting all the locations that are in between source and destination wind flow
     intermediate_locations = get_intermediate_wind_locations(source_station, destination_station, acceleration[1], total_time);
@@ -127,15 +153,15 @@ def create_simulation_data(date, source_station, destination_station, accelerati
     
     while counter <= total_time:
         # calculating the new velocity for each intervals in between until the wind reaches the destination
-        last_wind_velocity = find_new_wind_velocity(initial_wind_velocity, acceleration[0], counter);
+        last_wind_velocity = find_new_wind_velocity(initial_wind_velocity, acceleration[0], (counter*480));
         # finding the wind location after coriolis deflection for each point in the route
         actual_wind_location = find_new_wind_location(last_wind_velocity, counter, intermediate_locations);
         # writing the data to the file after finding the required attributes for a particular wind flow line
         write_to_csv_data(date,ID, source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], actual_wind_location, last_wind_velocity);
         counter += 1;
     
-    write_to_csv_data(date,ID,source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], intermediate_locations[len(intermediate_locations) - 1], initial_wind_velocity);
-            
+    write_to_csv_data(date,ID,source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], intermediate_locations[len(intermediate_locations) - 1], final_velocity);
+           
 # this function finds the velocity value for a particular location of a wind flow based on time that the wind started to flow from the sources            
 def find_new_wind_velocity(v0, a, t):
     return v0 + (a * t)
@@ -282,11 +308,10 @@ if __name__ == '__main__':
       
     broadcast_variable = sc.broadcast(broadcast_data);
     
-
     # analyzing the stations weather variables based on each date to create the simulation data for wind flow      
     final_data_after_creating_files = data_in_required_format.reduceByKey(create_data_from_station_data);
     
-    final_data_after_creating_files.count();
+    final_data_after_creating_files.first();
          
     # erasing the broadcast data set after use from everywhere
     broadcast_variable.unpersist(blocking=True); 
