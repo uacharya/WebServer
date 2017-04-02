@@ -171,21 +171,23 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
 def create_simulation_data(hdfs,date,ID,source_id,destination_id, source_station, destination_station, acceleration, time_to_reach,final_velocity):
    
-    initial_wind_velocity = last_wind_velocity = float(source_station["Station_Wind_Velocity"]);
+    start_velocity = initial_wind_velocity = float(source_station["Station_Wind_Velocity"]);
     total_time = int(math.ceil(time_to_reach/960));
     counter = 1;
     # getting all the locations that are in between source and destination wind flow
     intermediate_locations = get_intermediate_wind_locations(source_station, destination_station, acceleration[1], total_time);
     # writing first data so that first line starts from center of the source station
-    write_to_csv_data(hdfs,date,ID,source_id,destination_id,source_station["Station_Latitude"], source_station["Station_Longitude"], destination_station["Station_Latitude"],destination_station["Station_Longitude"],intermediate_locations[0], initial_wind_velocity);
+    write_to_csv_data(hdfs,date,ID,source_id,destination_id,source_station["Station_Latitude"], source_station["Station_Longitude"], destination_station["Station_Latitude"],destination_station["Station_Longitude"],intermediate_locations[0],start_velocity);
     
     while counter <= total_time:
-        # calculating the new velocity for each intervals in between until the wind reaches the destination
-        last_wind_velocity = find_new_wind_velocity(initial_wind_velocity, acceleration[0], (counter*960));
         # finding the wind location after coriolis deflection for each point in the route
-        actual_wind_location = find_new_wind_location(last_wind_velocity, counter, intermediate_locations);
+        actual_wind_location = find_new_wind_location(initial_wind_velocity, counter, intermediate_locations);
+        # calculating the new velocity for each intervals in between until the wind reaches the destination
+        last_wind_velocity = find_new_wind_velocity(start_velocity, acceleration[0], (counter*960));
         # writing the data to the file after finding the required attributes for a particular wind flow line
         write_to_csv_data(hdfs,date,ID, source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], actual_wind_location, last_wind_velocity);
+        
+        initial_wind_velocity = last_wind_velocity;
         counter += 1;
     
 #     write_to_csv_data(date,ID,source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], intermediate_locations[len(intermediate_locations) - 1], final_velocity);
@@ -231,11 +233,12 @@ def get_intermediate_wind_locations(source, destination, distance_in_radians, to
 def find_new_wind_location(velocity, counter, list_of_locations):
     current_location = list_of_locations[counter];
     current_latitute = math.radians(current_location[0]);
-    TOF = counter*960;
+    start_latitude = math.radians(list_of_locations[counter-1][0]);
+    TOF = 960;
     # total distance for one degree longitude in that latitude
     distance_for_one_degree_longitude = 111111 * math.cos(current_latitute);
     
-    coriolis_acceleration = 2 * velocity * ((2 * math.pi) / 86400) * math.sin(current_latitute);
+    coriolis_acceleration = 2 * velocity * ((2 * math.pi) / 86400) * math.sin(start_latitude);
     # gives distance displaced in meters
     distance_displaced_due_to_coriolis = 0.5 * coriolis_acceleration * (TOF ** 2);
     # total degrees of deflection
@@ -328,7 +331,7 @@ if __name__ == '__main__':
     sparkConf = SparkConf().setAppName("Creating Data");
     sc = SparkContext(conf=sparkConf);
 
-    distributed_dataset = sc.textFile("file:///Users/walluser/Desktop/testingSample.txt");
+    distributed_dataset = sc.textFile("file:///Users/walluser/Desktop/preprocessed_combined.txt");
     # getting the header of the whole dataset
     header = distributed_dataset.first();
     # filtering the header out of the data 
