@@ -7,6 +7,8 @@ Created on Mar 10, 2016
 from pyspark import SparkConf,SparkContext;
 import math;
 import os;
+from pywebhdfs.webhdfs import PyWebHdfsClient;
+
 
 # splits the line into individual dimension and creates a dictionary with key value pair 
 # with key being the date and value being the station's weather variable
@@ -24,44 +26,42 @@ def create_required_datewise_data(line):
 
 # this function creates the data analyzing the two stations in comparison
 def create_data_from_station_data(first, second):
-    from pywebhdfs.webhdfs import PyWebHdfsClient;
     hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya');
-    
     date_for_comparision = first["Date"].strip();
     
     # creating directory for each date
-    if not os.path.exists("/Users/walluser/Desktop/dataset/" + date_for_comparision):
-        os.mkdir("/Users/walluser/Desktop/dataset/" + date_for_comparision);
-#     try:
-#         hdfs.get_file_dir_status('user/uacharya/dataset/'+date_for_comparision);
-#     except Exception:
-#         hdfs.make_dir('user/uacharya/dataset/'+date_for_comparision);
-#         # directory to hold dataset in csv file for reach node in wall display starting from 1 to 9    
+#     if not os.path.exists("/Users/walluser/Desktop/dataset/" + date_for_comparision):
+#         os.mkdir("/Users/walluser/Desktop/dataset/" + date_for_comparision);
+    try:
+        hdfs.get_file_dir_status('user/uacharya/dataset/'+date_for_comparision);
+    except Exception:
+        hdfs.make_dir('user/uacharya/dataset/'+date_for_comparision);
+        # directory to hold dataset in csv file for reach node in wall display starting from 1 to 9    
         for index in range(1, 10):
-#             hdfs.make_dir('user/uacharya/dataset/'+date_for_comparision+"/node"+str(index));
-#             hdfs.create_file('user/uacharya/dataset/'+date_for_comparision+'/node'+str(index)+'/output.csv','');
-#             content = 'Date,ID,Source,Destination,S_Lat,S_Lon,D_Lat,D_Lon,Wind_Lat,Wind_Lon,Wind_Velocity\n';
-#             hdfs.append_file('user/uacharya/dataset/'+date_for_comparision+'/node'+str(index)+'/output.csv',content);
-            os.mkdir("/Users/walluser/Desktop/dataset/" + date_for_comparision + "/node" + str(index));
-            file_write = open("/Users/walluser/Desktop/dataset/" + date_for_comparision + "/node" + str(index)+"/data.csv","w+");
-            file_write.write("Date,ID,Source,Destination,S_Lat,S_Lon,D_Lat,D_Lon,Wind_Lat,Wind_Lon,Wind_Velocity\n");
-            file_write.close();
-#     try:
-#         hdfs.get_file_dir_status('user/uacharya/dataset/dataChecker');
-#     except Exception:
-#         hdfs.make_dir('user/uacharya/dataset/dataChecker');  
-    if not os.path.exists("/Users/walluser/Desktop/dataset/dataChecker"):
-        os.mkdir("/Users/walluser/Desktop/dataset/dataChecker");
-#     try:
-#         hdfs.get_file_dir_status('user/uacharya/dataset/dataChecker/'+date_for_comparision);
-#     except Exception:
-#         hdfs.make_dir('user/uacharya/dataset/dataChecker/'+date_for_comparision);
-#         hdfs.create_file('user/uacharya/dataset/dataChecker/'+date_for_comparision+'/check.txt','');
+            hdfs.make_dir('user/uacharya/dataset/'+date_for_comparision+"/node"+str(index));
+            hdfs.create_file('user/uacharya/dataset/'+date_for_comparision+'/node'+str(index)+'/output.csv','');
+            content = 'Date,ID,Source,Destination,S_Lat,S_Lon,D_Lat,D_Lon,Wind_Lat,Wind_Lon,Wind_Velocity\n';
+            hdfs.append_file('user/uacharya/dataset/'+date_for_comparision+'/node'+str(index)+'/output.csv',content);
+#             os.mkdir("/Users/walluser/Desktop/dataset/" + date_for_comparision + "/node" + str(index));
+#             file_write = open("/Users/walluser/Desktop/dataset/" + date_for_comparision + "/node" + str(index)+"/data.csv","w+");
+#             file_write.write("Date,ID,Source,Destination,S_Lat,S_Lon,D_Lat,D_Lon,Wind_Lat,Wind_Lon,Wind_Velocity\n");
+#             file_write.close();
+    try:
+        hdfs.get_file_dir_status('user/uacharya/dataset/dataChecker');
+    except Exception:
+        hdfs.make_dir('user/uacharya/dataset/dataChecker');  
+#     if not os.path.exists("/Users/walluser/Desktop/dataset/dataChecker"):
+#         os.mkdir("/Users/walluser/Desktop/dataset/dataChecker");
+    try:
+        hdfs.get_file_dir_status('user/uacharya/dataset/dataChecker/'+date_for_comparision);
+    except Exception:
+        hdfs.make_dir('user/uacharya/dataset/dataChecker/'+date_for_comparision);
+        hdfs.create_file('user/uacharya/dataset/dataChecker/'+date_for_comparision+'/check.txt','');
             
-    if not os.path.exists("/Users/walluser/Desktop/dataset/dataChecker/"+date_for_comparision):
-        os.mkdir("/Users/walluser/Desktop/dataset/dataChecker/"+date_for_comparision);         
-        file_write = open("/Users/walluser/Desktop/dataset/dataChecker/" + date_for_comparision +"/check.txt","a+");
-        file_write.close();
+#     if not os.path.exists("/Users/walluser/Desktop/dataset/dataChecker/"+date_for_comparision):
+#         os.mkdir("/Users/walluser/Desktop/dataset/dataChecker/"+date_for_comparision);         
+#         file_write = open("/Users/walluser/Desktop/dataset/dataChecker/" + date_for_comparision +"/check.txt","a+");
+#         file_write.close();
         
     for data in broadcast_variable.value:
         if data[0].strip() == date_for_comparision:
@@ -90,17 +90,17 @@ def compare_data_between(date, first_station, second_station,hdfs):
             destination_id = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
             ID = source_id+"_to_"+destination_id;
             #checking if the data for particular pair has already been written
-#             if ID in hdfs.read_file('user/uacharya/dataset/dataChecker/'+date+'/check.txt'):
-#                 return;
-#             else:
-#                 content = ID+',';
-#                 hdfs.append_file('user/uacharya/dataset/dataChecker/'+date+'/check.txt',content);
-            if ID in open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt").read():
+            if ID in hdfs.read_file('user/uacharya/dataset/dataChecker/'+date+'/check.txt'):
                 return;
             else:
-                file_write = open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt","a+");
-                file_write.write(ID+",");
-                file_write.close();
+                content = ID+',';
+                hdfs.append_file('user/uacharya/dataset/dataChecker/'+date+'/check.txt',content);
+#             if ID in open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt").read():
+#                 return;
+#             else:
+#                 file_write = open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt","a+");
+#                 file_write.write(ID+",");
+#                 file_write.close();
             
             # getting the final destination wind velocity using bernoulli principle
             temp_value = 2 * (((first_station_pressure / first_station_air_density) - (second_station_pressure / second_station_air_density)) + 
@@ -118,17 +118,17 @@ def compare_data_between(date, first_station, second_station,hdfs):
             destination_id = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
             ID = source_id+"_to_"+destination_id;
             #checking if the data for particular pair has already been written
-#             if ID in hdfs.read_file('user/uacharya/dataset/dataChecker/'+date+'/check.txt'):
-#                 return;
-#             else:
-#                 content = ID+',';
-#                 hdfs.append_file('user/uacharya/dataset/dataChecker/'+date+'/check.txt',content);
-            if ID in open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt").read():
+            if ID in hdfs.read_file('user/uacharya/dataset/dataChecker/'+date+'/check.txt'):
                 return;
             else:
-                file_write = open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt","a+");
-                file_write.write(ID+",");
-                file_write.close();
+                content = ID+',';
+                hdfs.append_file('user/uacharya/dataset/dataChecker/'+date+'/check.txt',content);
+#             if ID in open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt").read():
+#                 return;
+#             else:
+#                 file_write = open("/Users/walluser/Desktop/dataset/dataChecker/" + date +"/check.txt","a+");
+#                 file_write.write(ID+",");
+#                 file_write.close();
             
             # getting the final destination wind velocity using bernoulli principle
             temp_value = 2 * (((second_station_pressure / second_station_air_density) - (first_station_pressure / first_station_air_density)) + 
@@ -253,52 +253,51 @@ def write_to_csv_data(hdfs,date,ID, source_id,destination_id,source_lat,source_l
     which_node_does_location_belong_to = find_node_location(coordinates);
     content = date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity)+"\n";
         
-    
     if (which_node_does_location_belong_to=="Node_1"):
-#         hdfs.append_file('user/uacharya/dataset/'+date+'/node1/output.csv',content);
-        file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node1/data.csv","a+");
-        file_to_write.write(content);
-        file_to_write.close();
+        hdfs.append_file('user/uacharya/dataset/'+date+'/node1/output.csv',content);
+#         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node1/data.csv","a+");
+#         file_to_write.write(content);
+#         file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_2"):
-#         hdfs.append_file('user/uacharya/dataset/'+date+'/node2/output.csv',content);
-        file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node2/data.csv","a+");
-        file_to_write.write(content);
-        file_to_write.close();
+        hdfs.append_file('user/uacharya/dataset/'+date+'/node2/output.csv',content);
+#         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node2/data.csv","a+");
+#         file_to_write.write(content);
+#         file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_3"):
-#         hdfs.append_file('user/uacharya/dataset/'+date+'/node3/output.csv',content);
-        file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node3/data.csv","a+");
-        file_to_write.write(content);
-        file_to_write.close();
+        hdfs.append_file('user/uacharya/dataset/'+date+'/node3/output.csv',content);
+#         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node3/data.csv","a+");
+#         file_to_write.write(content);
+#         file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_4"):
-#         hdfs.append_file('user/uacharya/dataset/'+date+'/node4/output.csv',content);
-        file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node4/data.csv","a+");
-        file_to_write.write(content);
-        file_to_write.close();
+        hdfs.append_file('user/uacharya/dataset/'+date+'/node4/output.csv',content);
+#         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node4/data.csv","a+");
+#         file_to_write.write(content);
+#         file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_5"):
-#         hdfs.append_file('user/uacharya/dataset/'+date+'/node5/output.csv',content);
-        file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node5/data.csv","a+");
-        file_to_write.write(content);
-        file_to_write.close();
+        hdfs.append_file('user/uacharya/dataset/'+date+'/node5/output.csv',content);
+#         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node5/data.csv","a+");
+#         file_to_write.write(content);
+#         file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_6"):
-#         hdfs.append_file('user/uacharya/dataset/'+date+'/node6/output.csv',content);
-        file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node6/data.csv","a+");
-        file_to_write.write(content);
-        file_to_write.close();
+        hdfs.append_file('user/uacharya/dataset/'+date+'/node6/output.csv',content);
+#         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node6/data.csv","a+");
+#         file_to_write.write(content);
+#         file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_7"):
-#         hdfs.append_file('user/uacharya/dataset/'+date+'/node7/output.csv',content);
-        file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node7/data.csv","a+");
-        file_to_write.write(content);
-        file_to_write.close();
+        hdfs.append_file('user/uacharya/dataset/'+date+'/node7/output.csv',content);
+#         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node7/data.csv","a+");
+#         file_to_write.write(content);
+#         file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_8"):
-#         hdfs.append_file('user/uacharya/dataset/'+date+'/node8/output.csv',content);
-        file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node8/data.csv","a+");
-        file_to_write.write(content);
-        file_to_write.close();
+        hdfs.append_file('user/uacharya/dataset/'+date+'/node8/output.csv',content);
+#         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node8/data.csv","a+");
+#         file_to_write.write(content);
+#         file_to_write.close();
     elif(which_node_does_location_belong_to=="Node_9"):
-#         hdfs.append_file('user/uacharya/dataset/'+date+'/node9/output.csv',content);
-        file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node9/data.csv","a+");
-        file_to_write.write(content);
-        file_to_write.close();
+        hdfs.append_file('user/uacharya/dataset/'+date+'/node9/output.csv',content);
+#         file_to_write = open("/Users/walluser/Desktop/dataset/"+date+"/node9/data.csv","a+");
+#         file_to_write.write(content);
+#         file_to_write.close();
         
 # this function returns a location where the wind line belongs to among all of the monitors based on mercator projection
 def find_node_location(coordinates):
@@ -328,10 +327,10 @@ def find_node_location(coordinates):
 if __name__ == '__main__':
     
     # configure the spark environment
-    sparkConf = SparkConf().setAppName("Creating Data");
+    sparkConf = SparkConf().setAppName("Simulating Streamline");
     sc = SparkContext(conf=sparkConf);
 
-    distributed_dataset = sc.textFile("file:///Users/walluser/Desktop/preprocessed_combined.txt");
+    distributed_dataset = sc.textFile("hdfs:/user/uacharya/testingSample.txt");
     # getting the header of the whole dataset
     header = distributed_dataset.first();
     # filtering the header out of the data 
@@ -339,23 +338,25 @@ if __name__ == '__main__':
     # mapping the data to prepare for processing
     data_in_required_format = distributed_dataset.map(create_required_datewise_data);
     
-    temp = set(data_in_required_format.keys().collect());
-    
-    sorted_keys = sorted(temp,key=int);
-    
-    write_keys = open("/Users/walluser/Desktop/keys.txt","w+");
-    write_keys.write(str(sorted_keys));
-    write_keys.close();
-    
     broadcast_data = data_in_required_format.collect();
       
     broadcast_variable = sc.broadcast(broadcast_data);
     
+    temp = set(data_in_required_format.keys().collect());
+    
+    sorted_keys = sorted(temp,key=int);
+    
+    hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya');
+    keys_data = str(sorted_keys);
+    hdfs.create_file('user/uacharya/keys.txt',keys_data);       
+#     write_keys = open("/Users/walluser/Desktop/keys.txt","w+");
+#     write_keys.write(str(sorted_keys));
+#     write_keys.close();
+    
     # analyzing the stations weather variables based on each date to create the simulation data for wind flow      
     final_data_after_creating_files = data_in_required_format.reduceByKey(create_data_from_station_data);
     
-    final_data_after_creating_files.first();
-         
+    final_data_after_creating_files.first();     
     # erasing the broadcast data set after use from everywhere
     broadcast_variable.unpersist(blocking=True); 
     
