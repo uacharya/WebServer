@@ -6,10 +6,6 @@ Created on Mar 10, 2016
 
 from pyspark import SparkConf,SparkContext;
 import math;
-import os;
-from pywebhdfs.webhdfs import PyWebHdfsClient;
-
-
 # splits the line into individual dimension and creates a dictionary with key value pair 
 # with key being the date and value being the station's weather variable
 def create_required_datewise_data(line):
@@ -26,6 +22,8 @@ def create_required_datewise_data(line):
 
 # this function creates the data analyzing the two stations in comparison
 def create_data_from_station_data(first, second):
+    from pywebhdfs.webhdfs import PyWebHdfsClient;
+    
     hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya');
     date_for_comparision = first["Date"].strip();
     
@@ -329,7 +327,10 @@ if __name__ == '__main__':
     # configure the spark environment
     sparkConf = SparkConf().setAppName("Simulating Streamline");
     sc = SparkContext(conf=sparkConf);
-
+    sc.addPyFile("bundle.zip"); #adding library into python path
+    
+    from pywebhdfs.webhdfs import PyWebHdfsClient;
+    
     distributed_dataset = sc.textFile("hdfs:/user/uacharya/testingSample.txt");
     # getting the header of the whole dataset
     header = distributed_dataset.first();
@@ -337,15 +338,15 @@ if __name__ == '__main__':
     distributed_dataset = distributed_dataset.filter(lambda d: d != header);
     # mapping the data to prepare for processing
     data_in_required_format = distributed_dataset.map(create_required_datewise_data);
-    
+    #collecting all the dataset for broadcasting
     broadcast_data = data_in_required_format.collect();
-      
+    #broadcasting the entire dataset  
     broadcast_variable = sc.broadcast(broadcast_data);
     
     temp = set(data_in_required_format.keys().collect());
-    
+    #getting keys for use in future
     sorted_keys = sorted(temp,key=int);
-    
+    #writing the keys value to a file
     hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya');
     keys_data = str(sorted_keys);
     hdfs.create_file('user/uacharya/keys.txt',keys_data);       
