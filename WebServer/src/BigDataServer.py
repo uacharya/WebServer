@@ -44,6 +44,7 @@ class customHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.close();
             else:
                 self.wfile.write("Not Ready");
+                
                 self.wfile.close();   
         except:
             self.send_error(404,"file not found here i was found");
