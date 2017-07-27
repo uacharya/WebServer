@@ -11,7 +11,7 @@ from numpy import interp;
 import numpy as np;
 from PIL import Image, ImageDraw;
 import cStringIO,struct;
-import cPickle, pickle,sys;
+import cPickle, pickle,msgpack;
 from base64 import b64encode;
 
 
@@ -325,6 +325,7 @@ class DataInDifferentFormat(Thread):
     def __draw_images(self, bitmap_data, path_stream_data):
         """This function creates PNG images for each frame of streamline flow animation and stores them in stream data to stream later on"""
         PNG_stream_data = [];  # list to hold all the PNG images data
+        content_length = 0; #variable to hold the total bytes length of all images
         for frame in range(1,61):
             t = float(frame * 16) / float(1000);
             img = Image.new("RGBA", (1280, 800), color=(0, 0, 0, 0));
@@ -351,13 +352,15 @@ class DataInDifferentFormat(Thread):
 #             img_str = b64encode(buf_string.getvalue());
 #             path_stream_data['frames'].append(img_str);
             PNG_stream_data.append(struct.pack('!H',buf_string.tell())+buf_string.getvalue());
+            content_length = content_length+(buf_string.tell()+2); 
             buf_string.close();
                
         # indicating to the dictionary that holdes all the data that bitmap data for particular date is ready now
         for node in self.args['bitmap'][self.date]:
 #             node["data"] = pickle.dumps(path_stream_data, protocol=1);
-            node['frames'] = PNG_stream_data;
-            node["data"] = json.dumps(path_stream_data);
+#             node['frames'] = (content_length,PNG_stream_data);
+            node["data"] = (json.dumps(path_stream_data),(content_length,PNG_stream_data));
+#             node['data'] = msgpack.packb(path_stream_data,use_bin_type=True);
             node["indicator"] = "ready";
 
         

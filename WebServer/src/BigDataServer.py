@@ -3,97 +3,110 @@ Created on Feb 29, 2016
 
 @author: Ujjwal Acharya
 '''
-import ast;
+import ast,os;
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+import SocketServer;
 from DataCreator import DataCreator,NotPresentError;
 from threading import Thread;
 
-
 # Create custom HTTPRequestHandler class
-class customHTTPRequestHandler(BaseHTTPRequestHandler):
+class CustomHTTPRequestHandler(BaseHTTPRequestHandler):  
     """ Custom http request handler which process request and sends response to the client based on the request type"""
     # method for handling the http get request from the client
     def do_GET(self):
         try:
             if("bitmap" in self.path and "PNGS" not in self.path):
-                #sending all the required headers
-                self.send_response(200,"ok");
-                self.send_header('mimetype','application/json');
-                self.send_header("Access-Control-Allow-Origin","null"); 
-                self.end_headers();
-                
+                       
                 start = self.path.index("_");
                 end = self.path.rfind("_");
                 date = int(self.path[start+1:end]);
-                output = data_creator.get_available_data(date, 0,bitmap=True);
-                #streaming the required data to client
-                self.wfile.write(output);
+                output = data_creator.get_available_data(date, 0,bitmap=True);  
+                #sending all the required headers             
+                self.send_response(200,"ok");
+                self.send_header('mimetype','multipart/json+png');
+                self.send_header("Access-Control-Allow-Origin","null"); 
+                self.send_header("Content-Length",len(output[0])+output[1][0]);
+                self.send_header('Connection', 'keep-alive');
+                self.end_headers();
+                #streaming the required data to client                
+                for png in output[1][1]:
+                    self.wfile.write(png);
+                    self.wfile.flush();
+                
+                self.wfile.write(output[0]);
                 self.wfile.flush();
-                self.wfile.close();
             
             elif("bitmap" in self.path and "PNGS"  in self.path):   
-                #sending all the required headers
-                self.send_response(200,"ok");
-                self.send_header('mimetype','image/png');
-                self.send_header("Access-Control-Allow-Origin","null");
-                self.end_headers();
                 
                 start = self.path.index("_");
                 end = self.path.rfind("_");
                 date = int(self.path[start+1:end]);
                 output = data_creator.get_available_data(date, 0,PNG=True);
-                #streaming the required data to client
-                for img in output:
-                    self.wfile.write(img);
-                    self.wfile.flush();
-                self.wfile.close();
-                 
-            elif("aggregated" in self.path):
                 #sending all the required headers
                 self.send_response(200,"ok");
+                self.send_header('mimetype','image/png');
                 self.send_header("Access-Control-Allow-Origin","null");
+                self.send_header("Content-Length",output[0]);
+                self.send_header('Connection', 'keep-alive');
                 self.end_headers();
+                #streaming the required data to client
+                for img in output[1]:
+                    self.wfile.write(img);
+                    self.wfile.flush();
+                 
+            elif("aggregated" in self.path):
                 
                 start = self.path.index("_");
                 end = self.path.rfind("_");
                 date = int(self.path[start+1:end]);
                 file_path= data_creator.get_available_data(date,0,aggregated=True);
+                #sending all the required headers
+                self.send_response(200,"ok");
+                self.send_header("Access-Control-Allow-Origin","null");
+                self.send_header('mimetype','application/json');
+                self.send_header("Content-Length",os.path.getsize(file_path));
+                self.send_header('Connection', 'keep-alive');
+                self.end_headers();
                 
                 file_to_send = open(file_path, "rb");  # opening the file to send
                 # sending file to client via output stream
                 self.wfile.write(file_to_send.read()) 
                 self.wfile.flush();
-                self.wfile.close();
                 
-            elif("raw" in self.path):   
-                #sending all the required headers
-                self.send_response(200,"ok");
-                self.send_header("Access-Control-Allow-Origin","null");
-                self.end_headers();
-                
+            elif("raw" in self.path): 
+                                  
                 start = self.path.index("_");
                 end = self.path.rfind("_");
                 date = int(self.path[start+1:end]);
                 file_path= data_creator.get_available_data(date,0,raw=True);
+                #sending all the required headers
+                self.send_response(200,"ok");
+                self.send_header("Access-Control-Allow-Origin","null");
+                self.send_header('mimetype','application/json');
+                self.send_header("Content-Length",os.path.getsize(file_path));
+                self.send_header('Connection', 'keep-alive');
+                self.end_headers();
                 
                 file_to_send = open(file_path, "rb");  # opening the file to send
                 # sending file to client via output stream
                 self.wfile.write(file_to_send.read()) 
                 self.wfile.flush();
-                self.wfile.close();
                 
             elif ("world-map" in self.path):
+                
+                file_path = "/Users/Uzwal/Desktop/ineGraph/world-map.json";             
                 #sending all the required headers
                 self.send_response(200,"ok");
                 self.send_header("Access-Control-Allow-Origin","null");
+                self.send_header('mimetype','application/json');
+                self.send_header("Content-Length",os.path.getsize(file_path));
+                self.send_header('Connection', 'keep-alive');
                 self.end_headers();
                 
-                file_to_send = open("/Users/Uzwal/Desktop/ineGraph/world-map.json", "rb");  # opening the file to send
+                file_to_send = open(file_path, "rb");  # opening the file to send
                 # sending file to client via output stream
                 self.wfile.write(file_to_send.read()) 
                 self.wfile.flush();
-                self.wfile.close();
-
             return;
         
         except IOError:
@@ -102,17 +115,11 @@ class customHTTPRequestHandler(BaseHTTPRequestHandler):
     
     #method for handling http post request  
     def do_POST(self):
-        
         content_len = int(self.headers['content-length']);
         posted_message = self.rfile.read(content_len);
         required_data_date = ast.literal_eval(posted_message)["date"];
         data_type = ast.literal_eval(posted_message)['type'];
-    
-        #send a connection was made response code
-        self.send_response(200,"ok");
-        self.send_header("Access-Control-Allow-Origin","null");
-        self.end_headers();
-        
+
         if(data_type=="raw"):              
             try:
                 response = data_creator.check_available_data(required_data_date, raw=True);
@@ -128,18 +135,26 @@ class customHTTPRequestHandler(BaseHTTPRequestHandler):
                 response = data_creator.check_available_data(required_data_date,aggregated=True); 
             except NotPresentError:
                     response = "not_ready"
-    
+        #sending all the required headers to the client
+        self.send_response(200,"ok");
+        self.send_header("Access-Control-Allow-Origin","null");
+        self.send_header('mimetype','text/plain');
+        self.send_header("Content-Length",len(response));
+        self.send_header('Connection', 'keep-alive');
+        self.end_headers();
         #sending the response back to client
         self.wfile.write(response);
         self.wfile.flush();
-        self.wfile.close();
-                   
+
+class ThreadedServer(SocketServer.ThreadingMixIn,HTTPServer):
+    """This class implements multi threaded httpserver so that more than one request can be handled at once"""
+    pass;
 
 def runServer():
     """ The http server which fetches data from hdfs and streams to client upon request """
     try:
         server_address = ("127.0.0.1", 8085);
-        httpServer = HTTPServer(server_address, customHTTPRequestHandler);
+        httpServer = ThreadedServer(server_address, CustomHTTPRequestHandler);
         print("web server is running");
         httpServer.serve_forever();     
     except KeyboardInterrupt:
@@ -147,7 +162,6 @@ def runServer():
         httpServer.socket.close();
         
         
-
 if __name__ == '__main__':
     global data_creator; #one object to hold all the data to stream to the client
     #starting the new thread to run server separately
@@ -157,11 +171,3 @@ if __name__ == '__main__':
     data_creator =  DataCreator();
     data_creator.create_data_for_date(1929,aggregation_width=10);
     #continuing with the regular server active process for data creation
-
-
-
-    
-        
-    
-    
-    
