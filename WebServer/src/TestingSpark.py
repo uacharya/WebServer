@@ -1,5 +1,6 @@
 from pyspark import SparkConf,SparkContext;
 import math;
+from pyspark.serializers import MarshalSerializer
 
 hdfs = None #global hdfs connection object one for each thread
 
@@ -72,8 +73,9 @@ def create_data_from_station_data(first, second):
     # append over here after all the global variable has been made        
     return second;
 
-# this function does the detailed comparing of a pair of stations using equations of physics to create wind flow simulation
+
 def compare_data_between(date, first_station, second_station,dataset):
+    """this function does the detailed comparing of a pair of stations using equations of physics to create wind flow simulation"""
     global hdfs;
     if first_station != second_station:
         first_station_pressure = float(first_station["Station_Pressure"]);
@@ -323,11 +325,10 @@ def find_node_location(coordinates):
 if __name__ == '__main__':
     # configure the spark environment
     sparkConf = SparkConf().setAppName("Simulating Streamline");
+    sparkConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
     sc = SparkContext(conf=sparkConf);
     sc.addPyFile("module.zip"); #adding pywebhdfs to python path
-    
 #     from pywebhdfs.webhdfs import PyWebHdfsClient;
-    
     distributed_dataset = sc.textFile("hdfs:/user/uacharya/preprocessed_combined.txt",minPartitions=45);
     print("this is the driver container");
     # getting the header of the whole dataset
