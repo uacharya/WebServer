@@ -117,8 +117,9 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_len = int(self.headers['content-length']);
         posted_message = self.rfile.read(content_len);
-        required_data_date = ast.literal_eval(posted_message)["date"];
-        data_type = ast.literal_eval(posted_message)['type'];
+        posted_message = ast.literal_eval(posted_message);
+        required_data_date = posted_message["date"];
+        data_type = posted_message['type'];
 
         if(data_type=="raw"):              
             try:

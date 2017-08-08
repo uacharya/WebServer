@@ -15,19 +15,16 @@ import cPickle, pickle,msgpack;
 from base64 import b64encode;
 
 
-"""Two global objects one for holding nested data for streamline based on flow ID between two stations and other for holding the
-transformed pixel data of all lon and lat pair for streamline view in client side"""
-
-mercator_projected_coordinates = None; 
-nested_data_based_on_id = None;
-
 class DataCreator():
     """Class which is responsible for creating the data in different formats and streaming to the client upon request"""
+    
     def __init__(self):
         self.__raw_data_for_date = {};
         self.__canvas_data_for_date = {};
         self.__aggregated_data_for_date = {};
         self.lock = threading.Lock();
+        #calling a class method to read pixel cooridnates of spatial coordinates into a array to use later
+        DataInDifferentFormat.read_transformed_coordinates_to_array(); 
         
         
     def create_data_for_date(self, date, aggregation_width=None):
@@ -51,11 +48,13 @@ class DataCreator():
         for _index in range(0, 1):
             self.__aggregated_data_for_date[date].append({"indicator":"not_ready", "data":None});
             
+        data= defaultdict(list); #for holding nested data for streamline based on flow ID between two stations
+            
         # call the class that should create data in two additional formats
-        agg_obj = DataInDifferentFormat(date, aggregate=self.__aggregated_data_for_date, lock=self.lock);
+        agg_obj = DataInDifferentFormat(date, aggregate=self.__aggregated_data_for_date,nested_data=data,lock=self.lock);
         agg_obj.start();
         
-        bitmap_obj = DataInDifferentFormat(date, bitmap=self.__canvas_data_for_date, interpolation_width=0, lock=self.lock);
+        bitmap_obj = DataInDifferentFormat(date, bitmap=self.__canvas_data_for_date,nested_data=data, interpolation_width=0, lock=self.lock);
         bitmap_obj.start();
 
         # asking the main thread to sleep until the other threads are finished
@@ -141,6 +140,9 @@ class InvalidFormatError(Exception):
 
 class DataInDifferentFormat(Thread):
     """ This threaded class object is responsible for creating new data in different format as per the requirement"""
+    
+    mercator_projected_coordinates=None #class variable for holding the transformed pixel data of all lon and lat pair for streamline view in client side
+     
     def __init__(self, date, **kwargs):
         Thread.__init__(self);
         self.date = date;
@@ -148,18 +150,16 @@ class DataInDifferentFormat(Thread):
         
     def run(self):
         if("bitmap" in self.args):
-            self.__read_transformed_coordinates_to_array();
             self.__create_PNG_images(self.args['interpolation_width'] if ('interpolation_width' in self.args) else 0);
 
         elif("aggregate" in self.args):
-            global nested_data_based_on_id;
             # the file to process
             file_path = "/Users/Uzwal/Desktop/ineGraph/data" + str(self.date) + ".csv";
             # reading as dictionary all the csv rows so that the ones with same streamline ID can be grouped into one list
             reader = csv.DictReader(open(file_path, 'rb', 2048));
             # locking the object so that other thread only read it after the object is populated
             self.args["lock"].acquire();
-            nested_data_based_on_id = defaultdict(list);
+            nested_data_based_on_id = self.args['nested_data'];
             # iterating over csv lines and grouping them according to same streamline ID
             for line in reader:
                 nested_data_based_on_id[line["ID"]].append(line);   
@@ -217,18 +217,18 @@ class DataInDifferentFormat(Thread):
             node["indicator"] = "ready";
             node["data"] = file_path;
         print("aggregated finised");
-            
-    def __read_transformed_coordinates_to_array(self):
+    
+    @classmethod
+    def read_transformed_coordinates_to_array(cls):
         """This function reads the mercator transformed coordinates from file to array only for first time the 
         server starts to intialize list to use"""   
-        global mercator_projected_coordinates;
         # only when list is empty
-        if(mercator_projected_coordinates == None):
-            mercator_projected_coordinates = [];
+        if(cls.mercator_projected_coordinates == None):
+            cls.mercator_projected_coordinates = [];
             with open("/Users/Uzwal/Desktop/ineGraph/projected_coord_data.txt", "rb") as read_file:
                 for line in read_file:
                     contents = line.split();
-                    mercator_projected_coordinates.append(contents);
+                    cls.mercator_projected_coordinates.append(contents);
     
                
     def __create_PNG_images(self, interpolation_width): 
@@ -238,10 +238,10 @@ class DataInDifferentFormat(Thread):
         # list to store all the lines data to draw in bitmap later on
         bitmap_data = [];
         checker = set();
-        
         x_end_points_in_view = (-3898.2296905911007, 4898.229690591101);
         # getting lock for the global dictionary that holds the flow data
         self.args["lock"].acquire();
+        nested_data_based_on_id = self.args['nested_data'];
         # normalizing arrow size based on the number of lines in a particular flow
         upper_bound = len(nested_data_based_on_id[max(nested_data_based_on_id, key=lambda x: len(nested_data_based_on_id[x]))]);
         # iterating through every flow between two stations
@@ -408,13 +408,13 @@ class DataInDifferentFormat(Thread):
             else:
                 x_frac = abs(lon % int(lon));
         # two ends of a interpolation spectrum  
-        upper_coordinates = mercator_projected_coordinates[upper_i][upper_j].split(",");
-        lower_coordinates = mercator_projected_coordinates[lower_i][lower_j].split(",");
+        upper_coordinates = DataInDifferentFormat.mercator_projected_coordinates[upper_i][upper_j].split(",");
+        lower_coordinates = DataInDifferentFormat.mercator_projected_coordinates[lower_i][lower_j].split(",");
         # getting the difference between two points in the range to interpolate the pixels in both x and y directions
         x_diff = abs(float(lower_coordinates[0]) - float(upper_coordinates[0]));
         y_diff = abs(float(lower_coordinates[1]) - float(upper_coordinates[1]));
         
-        start_coordinates = mercator_projected_coordinates[starting_y][starting_x].split(",");
+        start_coordinates = DataInDifferentFormat.mercator_projected_coordinates[starting_y][starting_x].split(",");
         return (float(start_coordinates[0]) + (x_frac * x_diff), float(start_coordinates[1]) + (y_frac * y_diff));
     
     def __tween_the_curves(self, a, b, x0, x1, min_x, max_x):
