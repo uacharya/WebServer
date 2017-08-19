@@ -454,7 +454,7 @@ def find_node_location(coordinates):
 if __name__ == '__main__':
     # configure the spark environment
     sparkConf = SparkConf().setAppName("Simulating Streamline");
-    sc = SparkContext(conf=sparkConf,serializer=MarshalSerializer());
+    sc = SparkContext(conf=sparkConf);
         
     distributed_dataset = sc.textFile("hdfs:/user/uacharya/preprocessed_combined.txt",minPartitions=45);
     print("this is the driver container");

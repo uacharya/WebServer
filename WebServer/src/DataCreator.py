@@ -10,12 +10,12 @@ from collections import defaultdict;
 from numpy import interp;
 import numpy as np;
 from PIL import Image, ImageDraw;
-import cStringIO,struct;
+import cStringIO,struct,time;
 import cPickle, pickle,msgpack;
 from base64 import b64encode;
 
 
-class DataCreator():
+class DataCreator(object):
     """Class which is responsible for creating the data in different formats and streaming to the client upon request"""
     
     def __init__(self):
@@ -26,7 +26,7 @@ class DataCreator():
         #calling a class method to read pixel cooridnates of spatial coordinates into a array to use later
         DataInDifferentFormat.read_transformed_coordinates_to_array(); 
         
-        
+
     def create_data_for_date(self, date, aggregation_width=None):
         """Function which gets the date for the data which is ready and initiates the process of creating of the data in different formats
            which could be requested by the client so that the respective data could be streamed"""
@@ -234,7 +234,7 @@ class DataInDifferentFormat(Thread):
     def __create_PNG_images(self, interpolation_width): 
         """This function reads the streamline data and created images for all 60 frames based on the data"""
         # dictionary to hold the images data and every path data to stream to client
-        path_stream_data = {'stations':[], 'path':[]};
+        path_stream_data = {'frames':[],'stations':[], 'path':[]};
         # list to store all the lines data to draw in bitmap later on
         bitmap_data = [];
         checker = set();
@@ -351,16 +351,18 @@ class DataInDifferentFormat(Thread):
             img.save(buf_string, format="PNG", quality=100);
 #             img_str = b64encode(buf_string.getvalue());
 #             path_stream_data['frames'].append(img_str);
-            PNG_stream_data.append(struct.pack('!H',buf_string.tell())+buf_string.getvalue());
-            content_length = content_length+(buf_string.tell()+2); 
+#             PNG_stream_data.append(struct.pack('!H',buf_string.tell())+buf_string.getvalue());
+#             content_length = content_length+(buf_string.tell()+2); 
+            path_stream_data['frames'].append(buf_string.getvalue());
             buf_string.close();
                
         # indicating to the dictionary that holdes all the data that bitmap data for particular date is ready now
         for node in self.args['bitmap'][self.date]:
 #             node["data"] = pickle.dumps(path_stream_data, protocol=1);
 #             node['frames'] = (content_length,PNG_stream_data);
-            node["data"] = (json.dumps(path_stream_data),(content_length,PNG_stream_data));
-#             node['data'] = msgpack.packb(path_stream_data,use_bin_type=True);
+#             node["data"] = (json.dumps(path_stream_data),(content_length,PNG_stream_data));
+            node['data'] = msgpack.packb(path_stream_data,use_bin_type=True);
+#             node['data'] = json.dumps(path_stream_data);
             node["indicator"] = "ready";
 
         

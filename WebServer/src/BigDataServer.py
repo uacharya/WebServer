@@ -25,15 +25,15 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_response(200,"ok");
                 self.send_header('mimetype','multipart/json+png');
                 self.send_header("Access-Control-Allow-Origin","null"); 
-                self.send_header("Content-Length",len(output[0])+output[1][0]);
+                self.send_header("Content-Length",len(output));
                 self.send_header('Connection', 'keep-alive');
                 self.end_headers();
                 #streaming the required data to client                
-                for png in output[1][1]:
-                    self.wfile.write(png);
-                    self.wfile.flush();
+#                 for png in output[1][1]:
+#                     self.wfile.write(png);
+#                     self.wfile.flush();
                 
-                self.wfile.write(output[0]);
+                self.wfile.write(output);
                 self.wfile.flush();
             
             elif("bitmap" in self.path and "PNGS"  in self.path):   
@@ -168,7 +168,9 @@ if __name__ == '__main__':
     #starting the new thread to run server separately
     server = Thread(target=runServer);
     server.start();
+
     #instance that creates data in different format for each date
-    data_creator =  DataCreator();
+    data_creator =  DataCreator();   
     data_creator.create_data_for_date(1929,aggregation_width=10);
     #continuing with the regular server active process for data creation
+    

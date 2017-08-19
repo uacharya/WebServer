@@ -22,7 +22,8 @@ def create_data_from_station_data(first, second):
     
     if(hbase==None):
         import happybase; 
-        hbase = happybase.Connection('cshadoop.boisestate.edu');
+        hbase = happybase.ConnectionPool(size=1,host='cshadoop.boisestate.edu');
+        print('inside thread');
     
     date_for_comparision = first["Date"].strip();
     
@@ -33,15 +34,18 @@ def create_data_from_station_data(first, second):
         else:
             continue;
     
-    for key in dataset:
-        if(len(dataset[key])!=0):
-            t = hbase.table(key.encode('utf-8')); # table connection to update specifi data table
-            with t.batch() as b:
-                for data in dataset[key]:
-                    b.put('row',{'dataset:Date'.encode('utf-8'):data[0].encode('utf-8'),'dataset:ID'.encode('utf-8'):data[1].encode('utf-8'),'dataset:Source'.encode('utf-8'):data[2].encode('utf-8'),
-                                 'dataset:Destination'.encode('utf-8'):data[3].encode('utf-8'),'dataset:S_Lat'.encode('utf-8'):data[4].encode('utf-8'),'dataset:S_Lon'.encode('utf-8'):data[5].encode('utf-8'),
-                                 'dataset:D_Lat'.encode('utf-8'):data[6].encode('utf-8'),'dataset:D_Lon'.encode('utf-8'):data[7].encode('utf-8'),'dataset:Wind_Lat'.encode('utf-8'):data[8].encode('utf-8'),
-                                 'dataset:Wind_Lon'.encode('utf-8'):data[9].encode('utf-8'),'dataset:Wind_Velocity'.encode('utf-8'):data[10].encode('utf-8')});
+    from datetime import datetime;
+    with hbase.connection() as db:
+        for key in dataset:
+            if(len(dataset[key])!=0):
+                t = db.table(key.encode()); # table connection to update specific data table
+                with t.batch(batch_size=10000) as b:
+                    for data in dataset[key]:
+                        row = datetime.now().strftime("%H%M%S%f");
+                        b.put(row.encode(),{'dataset:Date'.encode():data[0].encode(),'dataset:ID'.encode():data[1].encode(),'dataset:Source'.encode():data[2].encode(),
+                                     'dataset:Destination'.encode():data[3].encode(),'dataset:S_Lat'.encode():data[4].encode(),'dataset:S_Lon'.encode():data[5].encode(),
+                                     'dataset:D_Lat'.encode():data[6].encode(),'dataset:D_Lon'.encode():data[7].encode(),'dataset:Wind_Lat'.encode():data[8].encode(),
+                                     'dataset:Wind_Lon'.encode():data[9].encode(),'dataset:Wind_Velocity'.encode():data[10].encode()});
                     
     
     dataset.clear(); #clearing the dictionary
@@ -52,81 +56,79 @@ def create_data_from_station_data(first, second):
 # this function does the detailed comparing of a pair of stations using equations of physics to create wind flow simulation
 def compare_data_between(date, first_station, second_station,dataset):
     global hbase;
-    table = hbase.table('dataChecker'.encode('utf-8')); # table connection to update data table
-    if first_station != second_station:
-        first_station_pressure = float(first_station["Station_Pressure"]);
-        second_station_pressure = float(second_station["Station_Pressure"]);
-        
-        first_station_wind_velocity = float(first_station["Station_Wind_Velocity"]);
-        second_station_wind_velocity = float(second_station["Station_Wind_Velocity"]);
-        
-        first_station_air_density = float(first_station["Station_Density"]);
-        second_station_air_density = float(second_station["Station_Density"]);
-        
-        
-        if(first_station_pressure > second_station_pressure):
-            source_id = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
-            destination_id = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
-            ID = source_id+"_to_"+destination_id;
-            #checking if the data for particular pair has already been written
-            data='';
-            res = table.row(date.encode('utf-8'));
-            if(len(res.keys())==0):
-                pass;
-            else:
-                data = res['flow:data'].decode('utf-8');
-                
-            if ID in data:
-                return;
-            else:
-                content = data + ID+',';
-                table.delete(date.encode('utf-8'));
-                table.put(date.encode('utf-8'),{'flow:data'.encode('utf-8'):content.encode('utf-8')});
-                
-            # getting the final destination wind velocity using bernoulli principle
-            temp_value = 2 * (((first_station_pressure / first_station_air_density) - (second_station_pressure / second_station_air_density)) + 
-                                        (717 * (float(first_station["Temperature"]) - float(second_station["Temperature"]))) + 
-                                        (9.8 * (float(first_station["Station_Elevation"]) - float(second_station["Station_Elevation"]))) + 
-                                        + (0.5 * (first_station_wind_velocity * first_station_wind_velocity)));
-            destination_wind_velocity = math.sqrt(abs(temp_value));
+    with hbase.connection() as db:
+        table = db.table('dataChecker'.encode()); # table connection to update data table
+        if first_station != second_station:
+            first_station_pressure = float(first_station["Station_Pressure"]);
+            second_station_pressure = float(second_station["Station_Pressure"]);
             
-            wind_flow_acceleration = get_acceleration_for_wind_flow(first_station, second_station);
-            time_required_to_reach_destination_in_seconds = (destination_wind_velocity - first_station_wind_velocity) / wind_flow_acceleration[0];
-            create_simulation_data(date,ID,source_id,destination_id, first_station, second_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds,destination_wind_velocity,dataset);
+            first_station_wind_velocity = float(first_station["Station_Wind_Velocity"]);
+            second_station_wind_velocity = float(second_station["Station_Wind_Velocity"]);
             
-        elif second_station_pressure>first_station_pressure:
-            source_id = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
-            destination_id = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
-            ID = source_id+"_to_"+destination_id;
-            #checking if the data for particular pair has already been written
-            data='';
-            res = table.row(date.encode('utf-8'));
-            if(len(res.keys())==0):
-                pass;
-            else:
-                data = res['flow:data'].decode('utf-8');
+            first_station_air_density = float(first_station["Station_Density"]);
+            second_station_air_density = float(second_station["Station_Density"]);
+            
+            if(first_station_pressure > second_station_pressure):
+                source_id = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
+                destination_id = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
+                ID = source_id+"_to_"+destination_id;
+                #checking if the data for particular pair has already been written
+                data='';
+                res = table.row(date.encode());
+                if(len(res.keys())==0):
+                    pass;
+                else:
+                    data = res['flow:data'].decode();
+                    
+                if ID in data:
+                    return;
+                else:
+                    content = data + ID+',';
+                    table.delete(date.encode());
+                    table.put(date.encode(),{'flow:data'.encode():content.encode()});
+                    
+                # getting the final destination wind velocity using bernoulli principle
+                temp_value = 2 * (((first_station_pressure / first_station_air_density) - (second_station_pressure / second_station_air_density)) + 
+                                            (717 * (float(first_station["Temperature"]) - float(second_station["Temperature"]))) + 
+                                            (9.8 * (float(first_station["Station_Elevation"]) - float(second_station["Station_Elevation"]))) + 
+                                            + (0.5 * (first_station_wind_velocity * first_station_wind_velocity)));
+                destination_wind_velocity = math.sqrt(abs(temp_value));
                 
-            if ID in data:
-                return;
-            else:
-                content = data + ID+',';
-                table.delete(date.encode('utf-8'));
-                table.put(date.encode('utf-8'),{'flow:data'.encode('utf-8'):content.encode('utf-8')});
-
-            # getting the final destination wind velocity using bernoulli principle
-            temp_value = 2 * (((second_station_pressure / second_station_air_density) - (first_station_pressure / first_station_air_density)) + 
-                                        (717 * (float(second_station["Temperature"]) - float(first_station["Temperature"]))) + 
-                                        (9.8 * (float(second_station["Station_Elevation"]) - float(first_station["Station_Elevation"]))) + 
-                                        + (0.5 * (second_station_wind_velocity * second_station_wind_velocity)));
-                                                                    
-            destination_wind_velocity = math.sqrt(abs(temp_value));
-            
-            wind_flow_acceleration = get_acceleration_for_wind_flow(second_station, first_station);
-            time_required_to_reach_destination_in_seconds = (destination_wind_velocity - second_station_wind_velocity) / wind_flow_acceleration[0];
-            create_simulation_data(date,ID,source_id,destination_id, second_station, first_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds,destination_wind_velocity,dataset);
-           
-    else:
-        return;
+                wind_flow_acceleration = get_acceleration_for_wind_flow(first_station, second_station);
+                time_required_to_reach_destination_in_seconds = (destination_wind_velocity - first_station_wind_velocity) / wind_flow_acceleration[0];
+                create_simulation_data(date,ID,source_id,destination_id, first_station, second_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds,destination_wind_velocity,dataset);
+                
+            elif second_station_pressure>first_station_pressure:
+                source_id = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
+                destination_id = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
+                ID = source_id+"_to_"+destination_id;
+                #checking if the data for particular pair has already been written
+                data='';
+                res = table.row(date.encode());
+                if(len(res.keys())==0):
+                    pass;
+                else:
+                    data = res['flow:data'].decode();
+                    
+                if ID in data:
+                    return;
+                else:
+                    content = data + ID+',';
+                    table.delete(date.encode());
+                    table.put(date.encode(),{'flow:data'.encode():content.encode()});
+    
+                # getting the final destination wind velocity using bernoulli principle
+                temp_value = 2 * (((second_station_pressure / second_station_air_density) - (first_station_pressure / first_station_air_density)) + 
+                                            (717 * (float(second_station["Temperature"]) - float(first_station["Temperature"]))) + 
+                                            (9.8 * (float(second_station["Station_Elevation"]) - float(first_station["Station_Elevation"]))) + 
+                                            + (0.5 * (second_station_wind_velocity * second_station_wind_velocity)));
+                                                                        
+                destination_wind_velocity = math.sqrt(abs(temp_value));
+                
+                wind_flow_acceleration = get_acceleration_for_wind_flow(second_station, first_station);
+                time_required_to_reach_destination_in_seconds = (destination_wind_velocity - second_station_wind_velocity) / wind_flow_acceleration[0];
+                create_simulation_data(date,ID,source_id,destination_id, second_station, first_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds,destination_wind_velocity,dataset);
+               
     
 
 # this function calculates the acceleration of the wind flow from one station to another based on pressure difference        
@@ -281,6 +283,7 @@ def find_node_location(coordinates):
     
             
 if __name__ == '__main__':
+    
     import happybase;
     # configure the spark environment
     sparkConf = SparkConf().setAppName("Simulating Streamline");
@@ -299,15 +302,16 @@ if __name__ == '__main__':
     #broadcasting the entire dataset  
     broadcast_variable = sc.broadcast(broadcast_data);
     
-    database = happybase.Connection('cshadoop.boisestate.edu');
-    
-    for index in range(1,10):
-        index = 'node'+str(index);
-        database.create_table(index.encode('utf-8'), {
-            'dataset'.encode('utf-8'):dict()
-            });
-            
-    database.create_table('dataChecker'.encode('utf-8'),{'flow'.encode('utf-8'):dict()});
+    database = happybase.ConnectionPool(size=1,host='cshadoop.boisestate.edu');
+    #getting a connection from the pool
+    with database.connection() as db:
+        for index in range(1,10):
+            index = 'node'+str(index);
+            db.create_table(index.encode(), {
+                'dataset'.encode():dict()
+                });
+                
+        db.create_table('dataChecker'.encode(),{'flow'.encode():dict()});
     
     temp = set(data_in_required_format.keys().collect());
     #getting keys for use in future
