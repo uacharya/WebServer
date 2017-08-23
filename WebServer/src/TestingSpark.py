@@ -268,7 +268,7 @@ def find_new_wind_location(velocity, counter, list_of_locations):
     
     new_lon = float(current_location[1]) - total_deflection_in_degree_of_longitude;
     # returning deflected new coordinate of the location
-    return [current_location[0], new_lon];
+    return (current_location[0], new_lon);
     
    
 def write_to_csv_data(date,ID, source_id,destination_id,source_lat,source_lon,destination_lat,destination_lon, coordinates, velocity,dataset):
@@ -302,23 +302,23 @@ def find_node_location(coordinates):
     latitude = coordinates[0];
     longitude = coordinates[1];
     
-    if((latitude <= 90 and latitude >= 30) and(longitude >= -180 and longitude <= -60)):
+    if((latitude <= 79 and latitude >= 54.548) and(longitude >= -180 and longitude <= -60.021)):
         return "Node_1";
-    elif((latitude <= 90 and latitude >= 30) and(longitude > -60 and longitude <= 60)):
+    elif((latitude <= 79 and latitude >= 54.548) and(longitude >=-60 and longitude <= 59.989)):
         return "Node_2";
-    elif((latitude <= 90 and latitude >= 30) and(longitude > 61 and longitude <= 180)):
+    elif((latitude <= 79 and latitude >= 54.548) and(longitude >=60 and longitude <= 180)):
         return "Node_3";
-    elif((latitude < 30 and latitude >= -30) and(longitude >= -180 and longitude <= -60)):
+    elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -180 and longitude <= -60.021)):
         return "Node_4";
-    elif((latitude < 30 and latitude >= -30) and(longitude > -60 and longitude <= 60)):
+    elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -60 and longitude <= 59.989)):
         return "Node_5";
-    elif((latitude < 30 and latitude >= -30) and(longitude > 61 and longitude <= 180)):
+    elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= 60 and longitude <= 180)):
         return "Node_6";
-    elif((latitude < -30 and latitude >= -90) and(longitude >= -180 and longitude <= -60)):
+    elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -180 and longitude <= -60.021)):
         return "Node_7";
-    elif((latitude < -30 and latitude >= -90) and(longitude > -60 and longitude <= 60)):
+    elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -60 and longitude <= 59.989)):
         return "Node_8";
-    elif((latitude < -30 and latitude >= -90) and(longitude > 61 and longitude <= 180)):
+    elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= 60 and longitude <= 180)):
         return "Node_9";
     
             
