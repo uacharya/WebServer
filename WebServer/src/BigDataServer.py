@@ -8,9 +8,8 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import SocketServer;
 from DataCreator import DataCreator,NotPresentError;
 from threading import Thread;
-
 # Create custom HTTPRequestHandler class
-class CustomHTTPRequestHandler(BaseHTTPRequestHandler):  
+class CustomHTTPRequestHandler(BaseHTTPRequestHandler): 
     """ Custom http request handler which process request and sends response to the client based on the request type"""
     # method for handling the http get request from the client
     def do_GET(self):
@@ -94,7 +93,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 
             elif ("world-map" in self.path):
                 
-                file_path = "/Users/Uzwal/Desktop/ineGraph/world-map.json";             
+                file_path = "C:\\Users\\walluser\\Desktop\\testing\\world-map.json";             
                 #sending all the required headers
                 self.send_response(200,"ok");
                 self.send_header("Access-Control-Allow-Origin","null");
@@ -165,12 +164,18 @@ def runServer():
         
 if __name__ == '__main__':
     global data_creator; #one object to hold all the data to stream to the client
+    from datetime import datetime;
+    start = datetime.now().strftime("%H%M%S%f");
     #starting the new thread to run server separately
-    server = Thread(target=runServer);
-    server.start();
-
+#     server = Thread(target=runServer);
+#     server.start();
+    DataCreator.read_transformed_coordinates_to_array();
     #instance that creates data in different format for each date
     data_creator =  DataCreator();   
     data_creator.create_data_for_date(1929,aggregation_width=10);
+    print(data_creator.check_available_data(1929,aggregated=True))
     #continuing with the regular server active process for data creation
+    end = datetime.now().strftime("%H%M%S%f");
+    print(end,start);
+    print(float(end)-float(start));
     

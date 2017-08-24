@@ -4,8 +4,8 @@ Created on Jun 7, 2017
 @author: Uzwal
 '''
 from threading import Thread;
-import threading;
-import math, csv, json;
+from multiprocessing import Process,Pipe;
+import math, csv, json,os;
 from collections import defaultdict;
 from numpy import interp;
 import numpy as np;
@@ -14,55 +14,71 @@ import cStringIO,struct,time;
 import cPickle, pickle,msgpack;
 from base64 import b64encode;
 
-
 class DataCreator(object):
     """Class which is responsible for creating the data in different formats and streaming to the client upon request"""
+    mercator_projected_coordinates=None #class variable for holding the transformed pixel data of all lon and lat pair for streamline view in client side
     
     def __init__(self):
         self.__raw_data_for_date = {};
         self.__canvas_data_for_date = {};
         self.__aggregated_data_for_date = {};
-        self.lock = threading.Lock();
-        #calling a class method to read pixel cooridnates of spatial coordinates into a array to use later
-        DataInDifferentFormat.read_transformed_coordinates_to_array(); 
         
-
     def create_data_for_date(self, date, aggregation_width=None):
         """Function which gets the date for the data which is ready and initiates the process of creating of the data in different formats
            which could be requested by the client so that the respective data could be streamed"""
         # adding a key for the available date raw data
         self.__raw_data_for_date[date] = [];
         # add the indicator that raw data is ready for all the node for a date 
-        for _index in range(0, 1):
-            self.__raw_data_for_date[date].append({"indicator":"ready", "data":"/Users/Uzwal/Desktop/ineGraph/data1929.csv"});
+        for _index in xrange(0, 1):
+            self.__raw_data_for_date[date].append({"indicator":"ready", "data":"C:\\Users\\walluser\\Desktop\\testing\\data1929.csv"});
         
         # adding a key for the date which bitmap data is to be created  
         self.__canvas_data_for_date[date] = [];
         # add the indicator that bitmap data is not ready for all the node for a date 
-        for _index in range(0, 1):
+        for _index in xrange(0, 1):
             self.__canvas_data_for_date[date].append({"indicator":"not_ready", "data":None, 'frames':None});
             
         # adding a key for the date which aggregated data is to be created  
         self.__aggregated_data_for_date[date] = [];
         # add the indicator that bitmap data is not ready for all the node for a date 
-        for _index in range(0, 1):
+        for _index in xrange(0, 1):
             self.__aggregated_data_for_date[date].append({"indicator":"not_ready", "data":None});
-            
-        data= defaultdict(list); #for holding nested data for streamline based on flow ID between two stations
-            
+        
+        #creating pipe to communicate between two proceses
+        agg_parent_conn,agg_child_conn = Pipe(duplex=False);
         # call the class that should create data in two additional formats
-        agg_obj = DataInDifferentFormat(date, aggregate=self.__aggregated_data_for_date,nested_data=data,lock=self.lock);
+        agg_obj = DataInDifferentFormat(date, aggregate=agg_child_conn);
         agg_obj.start();
         
-        bitmap_obj = DataInDifferentFormat(date, bitmap=self.__canvas_data_for_date,nested_data=data, interpolation_width=0, lock=self.lock);
+        #creating pipe to communicate between two proceses
+        bitmap_parent_conn,bitmap_child_conn = Pipe(duplex=False);
+        bitmap_obj = DataInDifferentFormat(date, bitmap=bitmap_child_conn,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
         bitmap_obj.start();
-
-        # asking the main thread to sleep until the other threads are finished
-        bitmap_obj.join();
-        agg_obj.join();
         
-            
+        for x in range(2):
+            if(x==1):
+                try:
+                    bitmap_response = bitmap_parent_conn.recv();
+                    bitmap_parent_conn.close();
+                    bitmap_completion_date= bitmap_response['d'];
+                    self.__canvas_data_for_date[bitmap_completion_date][0]['indicator']='ready';
+                except EOFError:
+                    pass;
+            else:
+                try:
+                    agg_response = agg_parent_conn.recv()
+                    agg_parent_conn.close();
+                    agg_completion_date,agg_completion_data = agg_response['d'],agg_response['p'];
+                    self.__aggregated_data_for_date[agg_completion_date][0]['indicator']='ready';
+                    self.__aggregated_data_for_date[agg_completion_date][0]["data"]= agg_completion_data;
+                except EOFError:
+                    pass;
+            print(x);
 
+        # asking the main thread to sleep until the other processes are finished
+        agg_obj.join();
+        bitmap_obj.join();
+        
     def check_available_data(self, date, raw=False, bitmap=False, aggregated=False):
         """ Function which checks if the data is available to stream to the client based on the parameters passed"""
         self.check_if_data_for_date_is_ready(date);
@@ -123,7 +139,17 @@ class DataCreator(object):
         if date not in self.__raw_data_for_date:
             raise NotPresentError("data for this date is not ready");
         
-        
+    @classmethod
+    def read_transformed_coordinates_to_array(cls):
+        """This function reads the mercator transformed coordinates from file to array only for first time the 
+        server starts to intialize list to use"""   
+        # only when list is empty
+        if(cls.mercator_projected_coordinates == None):
+            cls.mercator_projected_coordinates = [];
+            with open("C:\\Users\\walluser\\Desktop\\testing\\projected_coord_data.txt", "rb") as read_file:
+                for line in read_file:
+                    contents = line.split();
+                    cls.mercator_projected_coordinates.append(contents);
         
 class NotPresentError(Exception):
     """ Class that raise exception when data request is either not available or has not been yet created"""
@@ -138,13 +164,11 @@ class InvalidFormatError(Exception):
         self.message = message;
         
 
-class DataInDifferentFormat(Thread):
+class DataInDifferentFormat(Process):
     """ This threaded class object is responsible for creating new data in different format as per the requirement"""
-    
-    mercator_projected_coordinates=None #class variable for holding the transformed pixel data of all lon and lat pair for streamline view in client side
-     
+
     def __init__(self, date, **kwargs):
-        Thread.__init__(self);
+        Process.__init__(self);
         self.date = date;
         self.args = kwargs;
         
@@ -154,17 +178,14 @@ class DataInDifferentFormat(Thread):
 
         elif("aggregate" in self.args):
             # the file to process
-            file_path = "/Users/Uzwal/Desktop/ineGraph/data" + str(self.date) + ".csv";
+            file_path = "C:\\Users\\walluser\\Desktop\\testing\\data" + str(self.date) + ".csv";
             # reading as dictionary all the csv rows so that the ones with same streamline ID can be grouped into one list
             reader = csv.DictReader(open(file_path, 'rb', 2048));
-            # locking the object so that other thread only read it after the object is populated
-            self.args["lock"].acquire();
-            nested_data_based_on_id = self.args['nested_data'];
+            nested_data_based_on_id = defaultdict(list); #for holding nested data for streamline based on flow ID between two stations
             # iterating over csv lines and grouping them according to same streamline ID
             for line in reader:
                 nested_data_based_on_id[line["ID"]].append(line);   
-            self.args["lock"].release();
-            
+                            
             aggregated_output_data = {};  # local dictionary to write new aggregated data
             upper_bound = 0;  # getting the flow with the highest data points
             
@@ -183,6 +204,12 @@ class DataInDifferentFormat(Thread):
                         
                         if(len(temp) > upper_bound):
                             upper_bound = len(temp);
+                    else:
+                        aggregated_output_data[key] = data;
+                        
+                        if(total_data_points_for_a_flow > upper_bound):
+                            upper_bound = total_data_points_for_a_flow;
+                        
                 else: 
                     aggregated_output_data[key] = data;
                     
@@ -190,6 +217,8 @@ class DataInDifferentFormat(Thread):
                         upper_bound = total_data_points_for_a_flow;
             
             aggregated_output_data['upper_bound'] = upper_bound;
+            
+            del nested_data_based_on_id; # removing binding from the dict as it is no longer needed
             
             self.__write_data_to_file(aggregated_output_data);  
                            
@@ -203,33 +232,19 @@ class DataInDifferentFormat(Thread):
         rad_diff_lon = math.pi * (lon2 - lon1) / 180;
         a = math.sin(rad_diff_lat / 2) ** 2 + math.cos(rad_lat1) * math.cos(rad_lat2) * (math.sin(rad_diff_lon / 2) ** 2);
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-        # distance between the two points in meters
+        # distance between the two points in km
         return round(R * c);
     
     def __write_data_to_file(self, obj):
         """This function writes the aggregated data in the form of dictionary to a json file for later use"""
-        file_path = "/Users/Uzwal/Desktop/ineGraph/data_json_" + str(self.date) + ".json";
+        file_path = "C:\\Users\\walluser\\Desktop\\testing\\data_json_" + str(self.date) + ".json";
         # writing the data to a json file for each date
         with open(file_path, "w") as f:
             json.dump(obj, f);
         # updating the data dictionary that gives info about the data status
-        for node in self.args["aggregate"][self.date]:
-            node["indicator"] = "ready";
-            node["data"] = file_path;
-        print("aggregated finised");
-    
-    @classmethod
-    def read_transformed_coordinates_to_array(cls):
-        """This function reads the mercator transformed coordinates from file to array only for first time the 
-        server starts to intialize list to use"""   
-        # only when list is empty
-        if(cls.mercator_projected_coordinates == None):
-            cls.mercator_projected_coordinates = [];
-            with open("/Users/Uzwal/Desktop/ineGraph/projected_coord_data.txt", "rb") as read_file:
-                for line in read_file:
-                    contents = line.split();
-                    cls.mercator_projected_coordinates.append(contents);
-    
+        self.args["aggregate"].send({"d":self.date,'p':file_path});
+        self.args["aggregate"].close();
+        print("aggregated finised");    
                
     def __create_PNG_images(self, interpolation_width): 
         """This function reads the streamline data and created images for all 60 frames based on the data"""
@@ -239,13 +254,19 @@ class DataInDifferentFormat(Thread):
         bitmap_data = [];
         checker = set();
         x_end_points_in_view = (-3898.2296905911007, 4898.229690591101);
-        # getting lock for the global dictionary that holds the flow data
-        self.args["lock"].acquire();
-        nested_data_based_on_id = self.args['nested_data'];
+        # the file to process
+        file_path = "C:\\Users\\walluser\\Desktop\\testing\\data" + str(self.date) + ".csv";
+        # reading as dictionary all the csv rows so that the ones with same streamline ID can be grouped into one list
+        reader = csv.DictReader(open(file_path, 'rb', 2048));
+        #for holding nested data for streamline based on flow ID between two stations
+        nested_data = defaultdict(list); 
+        # iterating over csv lines and grouping them according to same streamline ID
+        for line in reader:
+            nested_data[line["ID"]].append(line); 
         # normalizing arrow size based on the number of lines in a particular flow
-        upper_bound = len(nested_data_based_on_id[max(nested_data_based_on_id, key=lambda x: len(nested_data_based_on_id[x]))]);
+        upper_bound = len(nested_data[max(nested_data, key=lambda x: len(nested_data[x]))]);
         # iterating through every flow between two stations
-        for key, value in nested_data_based_on_id.iteritems():
+        for key, value in nested_data.iteritems():
             arrow_size = interp(len(value), [1, upper_bound], [10, 1]);  # getting size of arrow based on the number of points in a flow
 #             print(key,arrow_size);
             station_data = value[0];
@@ -262,7 +283,7 @@ class DataInDifferentFormat(Thread):
                 checker.add(destination_station[0]);
             
             flow_data = []; #list for holding data for one flow  
-            for i in range(len(value)):
+            for i in xrange(len(value)):
                 if(i == len(value) - 1):
                     break;
                 x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));
@@ -291,12 +312,11 @@ class DataInDifferentFormat(Thread):
             path_stream_data['path'].append({key:flow_data,'h':arrow_size});
             #removing binding for this flow data
             del flow_data;
-                       
-        self.args["lock"].release();
         
-        del checker;  # clearing out the set as it is no longer needed
+        del checker;  # removing binding from the set as it is no longer needed
         
         self.__draw_images(bitmap_data, path_stream_data);
+        
         
     def __interpolate_array(self, a, b):
         """This function interpolates an array between two arrays based on the normalized fraction passed between 0 to 1"""
@@ -356,22 +376,18 @@ class DataInDifferentFormat(Thread):
             path_stream_data['frames'].append(buf_string.getvalue());
             buf_string.close();
                
-        # indicating to the dictionary that holdes all the data that bitmap data for particular date is ready now
-        for node in self.args['bitmap'][self.date]:
-#             node["data"] = pickle.dumps(path_stream_data, protocol=1);
-#             node['frames'] = (content_length,PNG_stream_data);
-#             node["data"] = (json.dumps(path_stream_data),(content_length,PNG_stream_data));
-            node['data'] = msgpack.packb(path_stream_data,use_bin_type=True);
-#             node['data'] = json.dumps(path_stream_data);
-            node["indicator"] = "ready";
-
-        
+#         node["data"] = pickle.dumps(path_stream_data, protocol=1);
+#         node['frames'] = (content_length,PNG_stream_data);
+#         node["data"] = (json.dumps(path_stream_data),(content_length,PNG_stream_data));
+#         node['data'] = msgpack.packb(path_stream_data,use_bin_type=True);
+#         node['data'] = json.dumps(path_stream_data);
+        msgpack.packb(path_stream_data,use_bin_type=True);
+        self.args["bitmap"].send({"d":self.date}); 
+        self.args["bitmap"].close();
         print("bitmap finished"); 
             
-            
-   
-    def __project_points_to_mercator(self, lon, lat):
 
+    def __project_points_to_mercator(self, lon, lat):
         """ This function tries to project the lon and lat to mercator projection as close as possible to d3's mercator projection"""
         lon_zero_degree_index = 180;  # index number in the array which holds value for zero degree longitude
         lat_zero_degree_index = 89;  # index number in the array which holds value for zero degree latitude
@@ -409,14 +425,15 @@ class DataInDifferentFormat(Thread):
                 x_frac = abs(lon);
             else:
                 x_frac = abs(lon % int(lon));
+
         # two ends of a interpolation spectrum  
-        upper_coordinates = DataInDifferentFormat.mercator_projected_coordinates[upper_i][upper_j].split(",");
-        lower_coordinates = DataInDifferentFormat.mercator_projected_coordinates[lower_i][lower_j].split(",");
+        upper_coordinates = self.args["projection_coord"][upper_i][upper_j].split(",");
+        lower_coordinates = self.args["projection_coord"][lower_i][lower_j].split(",");
         # getting the difference between two points in the range to interpolate the pixels in both x and y directions
         x_diff = abs(float(lower_coordinates[0]) - float(upper_coordinates[0]));
         y_diff = abs(float(lower_coordinates[1]) - float(upper_coordinates[1]));
         
-        start_coordinates = DataInDifferentFormat.mercator_projected_coordinates[starting_y][starting_x].split(",");
+        start_coordinates = self.args["projection_coord"][starting_y][starting_x].split(",");
         return (float(start_coordinates[0]) + (x_frac * x_diff), float(start_coordinates[1]) + (y_frac * y_diff));
     
     def __tween_the_curves(self, a, b, x0, x1, min_x, max_x):
@@ -519,11 +536,7 @@ class DataInDifferentFormat(Thread):
         temp.append([x1, y1]);
         temp.append([x2, y2]);
         return temp;
-              
-         
-            
-        
-            
+                                 
         
         
 
