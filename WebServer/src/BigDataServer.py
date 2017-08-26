@@ -14,15 +14,14 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     # method for handling the http get request from the client
     def do_GET(self):
         try:
-            if("bitmap" in self.path and "PNGS" not in self.path):
-                       
+            if("bitmap" in self.path and "PNGS" not in self.path):    
                 start = self.path.index("_");
                 end = self.path.rfind("_");
                 date = int(self.path[start+1:end]);
                 output = data_creator.get_available_data(date, 0,bitmap=True);  
                 #sending all the required headers             
                 self.send_response(200,"ok");
-                self.send_header('mimetype','multipart/json+png');
+                self.send_header('mimetype','multipart/json');
                 self.send_header("Access-Control-Allow-Origin","null"); 
                 self.send_header("Content-Length",len(output));
                 self.send_header('Connection', 'keep-alive');
@@ -58,18 +57,16 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 start = self.path.index("_");
                 end = self.path.rfind("_");
                 date = int(self.path[start+1:end]);
-                file_path= data_creator.get_available_data(date,0,aggregated=True);
+                data= data_creator.get_available_data(date,0,aggregated=True);
                 #sending all the required headers
                 self.send_response(200,"ok");
                 self.send_header("Access-Control-Allow-Origin","null");
                 self.send_header('mimetype','application/json');
-                self.send_header("Content-Length",os.path.getsize(file_path));
+                self.send_header("Content-Length",len(data));
                 self.send_header('Connection', 'keep-alive');
                 self.end_headers();
-                
-                file_to_send = open(file_path, "rb");  # opening the file to send
                 # sending file to client via output stream
-                self.wfile.write(file_to_send.read()) 
+                self.wfile.write(data) 
                 self.wfile.flush();
                 
             elif("raw" in self.path): 
@@ -77,6 +74,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 start = self.path.index("_");
                 end = self.path.rfind("_");
                 date = int(self.path[start+1:end]);
+                
                 file_path= data_creator.get_available_data(date,0,raw=True);
                 #sending all the required headers
                 self.send_response(200,"ok");
@@ -164,18 +162,14 @@ def runServer():
         
 if __name__ == '__main__':
     global data_creator; #one object to hold all the data to stream to the client
-    from datetime import datetime;
-    start = datetime.now().strftime("%H%M%S%f");
     #starting the new thread to run server separately
-#     server = Thread(target=runServer);
-#     server.start();
+    server = Thread(target=runServer);
+    server.start();
     DataCreator.read_transformed_coordinates_to_array();
     #instance that creates data in different format for each date
     data_creator =  DataCreator();   
     data_creator.create_data_for_date(1929,aggregation_width=10);
     print(data_creator.check_available_data(1929,aggregated=True))
     #continuing with the regular server active process for data creation
-    end = datetime.now().strftime("%H%M%S%f");
-    print(end,start);
-    print(float(end)-float(start));
+
     
