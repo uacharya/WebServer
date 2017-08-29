@@ -4,7 +4,7 @@ Created on Jun 7, 2017
 @author: Uzwal
 '''
 from threading import Thread;
-from multiprocessing import Pipe;
+from multiprocessing import Pipe, Queue;
 from DataWriter import DataInDifferentFormat,InvalidFormatError;
 import cStringIO,struct,json;
 import cPickle,msgpack;
@@ -40,46 +40,48 @@ class DataCreator(object):
         # add the indicator that bitmap data is not ready for all the node for a date 
         for _index in xrange(0, 1):
             self.__aggregated_data_for_date[date].append({"indicator":"not_ready", "data":None});
-    
-        #creating pipe to communicate between two proceses
-        agg_parent_conn,agg_child_conn = Pipe(duplex=False);
+            
+        list_of_processes=[];
+        q= Queue();
         # call the class that should create data in two additional formats
-        agg_obj = DataInDifferentFormat(date,0, aggregate=agg_child_conn);
-        agg_obj.start();
-        
-        #creating pipe to communicate between two proceses
-        bitmap_parent_conn,bitmap_child_conn = Pipe(duplex=False);
-        bitmap_obj = DataInDifferentFormat(date,0, bitmap=bitmap_child_conn,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
-        bitmap_obj.start();
-        
-        try:
-            agg_response = agg_parent_conn.recv()
-            agg_parent_conn.close();
-            agg_date,agg_node,agg_path = agg_response['d'],agg_response['n'],agg_response['p'];
-        except EOFError:
-            pass;
-        try:
-            bitmap_response = bitmap_parent_conn.recv();
-            bitmap_parent_conn.close();
-            bitmap_date,bitmap_node,bitmap_path= bitmap_response['d'],bitmap_response['n'],bitmap_response['p'];
-        except EOFError:
-            pass;
-        agg_obj.join();
-        bitmap_obj.join();
-        #single thread outperforming in this context
+        for i in range(1):
+            agg_obj = DataInDifferentFormat(date,i, aggregate=q);
+            agg_obj.start();
+            list_of_processes.append(agg_obj);
+            
+            bitmap_obj = DataInDifferentFormat(date,i, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
+            bitmap_obj.start();
+            list_of_processes.append(bitmap_obj);
+                
         import datetime;
         start = datetime.datetime.now();
-        agg_thread = ReadIntoMemory(self.__aggregated_data_for_date[agg_date][agg_node],agg_path,agg=True);
-        agg_thread.start();
-        bitmap_thread = ReadIntoMemory(self.__canvas_data_for_date[bitmap_date][bitmap_node],bitmap_path,bitmap=True);
-        bitmap_thread.start();
-        # asking the main thread to sleep until the other processes are finished
-        agg_thread.join();
-        bitmap_thread.join();
+        list_of_threads = [];
+        counter=1;
+        while counter<=2:
+            try:
+                response = q.get();
+                res_date,res_node,res_path = response['d'],response['n'],response['p'];
+                if('agg' in response):
+                    agg_thread=ReadIntoMemory(self.__aggregated_data_for_date[res_date][res_node],res_path,agg=True);
+                    agg_thread.run()
+                    list_of_threads.append(agg_thread);
+                elif('bmp' in response):
+                    bitmap_thread = ReadIntoMemory(self.__canvas_data_for_date[res_date][res_node],res_path,bitmap=True);
+                    bitmap_thread.run();
+                    list_of_threads.append(bitmap_thread);
+                counter+=1;
+            except Exception as e:
+                print(e.message);
+        
+        for t in range(len(list_of_threads)):
+            list_of_processes[t].join();
+            
         end = datetime.datetime.now();
         diff = end - start;
         elapsed_ms = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000);
-        print(elapsed_ms);
+        print(elapsed_ms);  
+        for i in range(len(list_of_processes)):
+            list_of_processes[i].join();
         
     def check_available_data(self, date, raw=False, bitmap=False, aggregated=False):
         """ Function which checks if the data is available to stream to the client based on the parameters passed"""
@@ -161,10 +163,10 @@ class NotPresentError(Exception):
         
 
 
-class ReadIntoMemory(Thread):
+class ReadIntoMemory(object):
     """This class takes the data from the disk and writes in the memory after data has been created my multiple processes one for each node"""
     def __init__(self,data_dict,path,**kwargs):
-        Thread.__init__(self);
+#         Thread.__init__(self);
         self.data_holder =data_dict;
         self.path = path;
         self.arg = kwargs;

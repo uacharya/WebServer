@@ -90,8 +90,7 @@ class DataInDifferentFormat(Process):
         with open(file_path, "wb") as f:
             cPickle.dump(obj, f,protocol=cPickle.HIGHEST_PROTOCOL);
         # updating the data dictionary that gives info about the data status
-        self.args["aggregate"].send({"d":self.date,'n':self.node, 'p':file_path});
-        self.args["aggregate"].close();
+        self.args["aggregate"].put({"d":self.date,'n':self.node,'agg':True,'p':file_path});
         print("aggregated finised");    
                
     def __create_PNG_images(self, interpolation_width): 
@@ -223,8 +222,7 @@ class DataInDifferentFormat(Process):
         with open(file_path, "wb") as f:
             cPickle.dump(path_stream_data, f, protocol=cPickle.HIGHEST_PROTOCOL);
 
-        self.args["bitmap"].send({"d":self.date,'n':self.node, 'p':dir_path});
-        self.args["bitmap"].close();
+        self.args["bitmap"].put({"d":self.date,'n':self.node,"bmp":True,'p':dir_path});
         print("bitmap finished"); 
             
 
