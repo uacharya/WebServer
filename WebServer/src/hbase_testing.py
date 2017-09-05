@@ -155,9 +155,10 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     
 
 def create_simulation_data(date,ID,source_id,destination_id, source_station, destination_station, acceleration, time_to_reach,final_velocity,dataset):
-   
+    """This function writes the data into each node data holder by performing a bit of calculation first"""
     start_velocity = initial_wind_velocity = float(source_station["Station_Wind_Velocity"]);
-    total_time = int(math.ceil(time_to_reach/960));
+    total_time = int(math.ceil(acceleration[1] * 6371)); #distance in km between points
+    time_in_seconds_per_step = time_to_reach/float(total_time);
     counter = 1;
     # getting all the locations that are in between source and destination wind flow
     intermediate_locations = get_intermediate_wind_locations(source_station, destination_station, acceleration[1], total_time);
@@ -168,7 +169,7 @@ def create_simulation_data(date,ID,source_id,destination_id, source_station, des
         # finding the wind location after coriolis deflection for each point in the route
         actual_wind_location = find_new_wind_location(initial_wind_velocity, counter, intermediate_locations);
         # calculating the new velocity for each intervals in between until the wind reaches the destination
-        last_wind_velocity = find_new_wind_velocity(start_velocity, acceleration[0], (counter*960));
+        last_wind_velocity = find_new_wind_velocity(start_velocity, acceleration[0], (counter*time_in_seconds_per_step));
         # writing the data to the file after finding the required attributes for a particular wind flow line
         write_to_csv_data(date,ID, source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], actual_wind_location, last_wind_velocity,dataset);
         
@@ -177,6 +178,7 @@ def create_simulation_data(date,ID,source_id,destination_id, source_station, des
     
 #     write_to_csv_data(date,ID,source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], intermediate_locations[len(intermediate_locations) - 1], final_velocity);
            
+       
 # this function finds the velocity value for a particular location of a wind flow based on time that the wind started to flow from the sources            
 def find_new_wind_velocity(v0, a, t):
     return v0 + (a * t)

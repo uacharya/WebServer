@@ -26,19 +26,19 @@ class DataCreator(object):
         # adding a key for the available date raw data
         self.__raw_data_for_date[date] = [];
         # add the indicator that raw data is ready for all the node for a date 
-        for _index in xrange(0, 1):
+        for _ in xrange(0, 1):
             self.__raw_data_for_date[date].append({"indicator":"ready", "data":"C:\\Users\\walluser\\Desktop\\testing\\data1929.csv"});
         
         # adding a key for the date which bitmap data is to be created  
         self.__canvas_data_for_date[date] = [];
         # add the indicator that bitmap data is not ready for all the node for a date 
-        for _index in xrange(0, 1):
+        for _ in xrange(0, 1):
             self.__canvas_data_for_date[date].append({"indicator":"not_ready", "data":None, 'frames':None});
             
         # adding a key for the date which aggregated data is to be created  
         self.__aggregated_data_for_date[date] = [];
         # add the indicator that bitmap data is not ready for all the node for a date 
-        for _index in xrange(0, 1):
+        for _ in xrange(0, 1):
             self.__aggregated_data_for_date[date].append({"indicator":"not_ready", "data":None});
             
         list_of_processes=[];
