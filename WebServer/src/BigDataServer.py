@@ -73,9 +73,9 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                                   
                 start = self.path.index("_");
                 end = self.path.rfind("_");
-                date = int(self.path[start+1:end]);
+                date_with_node = self.path[start+1:end].split(",");
                 
-                file_path= data_creator.get_available_data(date,0,raw=True);
+                file_path= data_creator.get_available_data(int(date_with_node[0]),int(date_with_node[1]),raw=True);
                 #sending all the required headers
                 self.send_response(200,"ok");
                 self.send_header("Access-Control-Allow-Origin","null");
@@ -91,7 +91,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 
             elif ("world-map" in self.path):
                 
-                file_path = "C:\\Users\\walluser\\Desktop\\testing\\world-map.json";             
+                file_path = "C:\\Users\\walluser\\javaWorkspace\\D3EventServer\\D3\\WebContent\\world-map.json";             
                 #sending all the required headers
                 self.send_response(200,"ok");
                 self.send_header("Access-Control-Allow-Origin","null");
@@ -151,7 +151,7 @@ class ThreadedServer(SocketServer.ThreadingMixIn,HTTPServer):
 def runServer():
     """ The http server which fetches data from hdfs and streams to client upon request """
     try:
-        server_address = ("127.0.0.1", 8085);
+        server_address = ("10.29.3.2", 8085);
         httpServer = ThreadedServer(server_address, CustomHTTPRequestHandler);
         print("web server is running");
         httpServer.serve_forever();     
@@ -168,8 +168,8 @@ if __name__ == '__main__':
     DataCreator.read_transformed_coordinates_to_array();
     #instance that creates data in different format for each date
     data_creator =  DataCreator();   
-    data_creator.create_data_for_date(1929,aggregation_width=10);
-    print(data_creator.check_available_data(1929,aggregated=True))
+    data_creator.create_data_for_date(19291128,aggregation_width=10);
+    print(data_creator.check_available_data(19291128,aggregated=True))
     #continuing with the regular server active process for data creation
 
     

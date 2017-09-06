@@ -7,7 +7,7 @@ from threading import Thread;
 from multiprocessing import Pipe, Queue;
 from DataWriter import DataInDifferentFormat,InvalidFormatError;
 import cStringIO,struct,json;
-import cPickle,msgpack;
+import cPickle;
 from PIL import Image; 
 from base64 import b64encode;
 
@@ -26,62 +26,62 @@ class DataCreator(object):
         # adding a key for the available date raw data
         self.__raw_data_for_date[date] = [];
         # add the indicator that raw data is ready for all the node for a date 
-        for _ in xrange(0, 1):
-            self.__raw_data_for_date[date].append({"indicator":"ready", "data":"C:\\Users\\walluser\\Desktop\\testing\\data1929.csv"});
+        for index in xrange(0, 9):
+            self.__raw_data_for_date[date].append({"indicator":"ready", "data":"C:\\D3\\temp\\"+str(date)+"\\node"+str(index+1)+"\\output.csv"});
         
         # adding a key for the date which bitmap data is to be created  
         self.__canvas_data_for_date[date] = [];
         # add the indicator that bitmap data is not ready for all the node for a date 
-        for _ in xrange(0, 1):
+        for _ in xrange(0, 9):
             self.__canvas_data_for_date[date].append({"indicator":"not_ready", "data":None, 'frames':None});
             
         # adding a key for the date which aggregated data is to be created  
         self.__aggregated_data_for_date[date] = [];
         # add the indicator that bitmap data is not ready for all the node for a date 
-        for _ in xrange(0, 1):
+        for _ in xrange(0, 9):
             self.__aggregated_data_for_date[date].append({"indicator":"not_ready", "data":None});
             
-        list_of_processes=[];
-        q= Queue();
-        # call the class that should create data in two additional formats
-        for i in range(1):
-            agg_obj = DataInDifferentFormat(date,i, aggregate=q);
-            agg_obj.start();
-            list_of_processes.append(agg_obj);
-            
-            bitmap_obj = DataInDifferentFormat(date,i, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
-            bitmap_obj.start();
-            list_of_processes.append(bitmap_obj);
-                
-        import datetime;
-        start = datetime.datetime.now();
-        list_of_threads = [];
-        counter=1;
-        while counter<=2:
-            try:
-                response = q.get();
-                res_date,res_node,res_path = response['d'],response['n'],response['p'];
-                if('agg' in response):
-                    agg_thread=ReadIntoMemory(self.__aggregated_data_for_date[res_date][res_node],res_path,agg=True);
-                    agg_thread.run()
-                    list_of_threads.append(agg_thread);
-                elif('bmp' in response):
-                    bitmap_thread = ReadIntoMemory(self.__canvas_data_for_date[res_date][res_node],res_path,bitmap=True);
-                    bitmap_thread.run();
-                    list_of_threads.append(bitmap_thread);
-                counter+=1;
-            except Exception as e:
-                print(e.message);
-        
-        for t in range(len(list_of_threads)):
-            list_of_processes[t].join();
-            
-        end = datetime.datetime.now();
-        diff = end - start;
-        elapsed_ms = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000);
-        print(elapsed_ms);  
-        for i in range(len(list_of_processes)):
-            list_of_processes[i].join();
+#         list_of_processes=[];
+#         q= Queue();
+#         # call the class that should create data in two additional formats
+#         for i in range(9):
+#             agg_obj = DataInDifferentFormat(date,i+1, aggregate=q);
+#             agg_obj.start();
+#             list_of_processes.append(agg_obj);
+#             
+#             bitmap_obj = DataInDifferentFormat(date,i+1, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
+#             bitmap_obj.start();
+#             list_of_processes.append(bitmap_obj);
+#                 
+#         import datetime;
+#         start = datetime.datetime.now();
+#         list_of_threads = [];
+#         counter=1;
+#         while counter<=len(list_of_processes):
+#             try:
+#                 response = q.get();
+#                 res_date,res_node,res_path = response['d'],response['n'],response['p'];
+#                 if('agg' in response):
+#                     agg_thread=ReadIntoMemory(self.__aggregated_data_for_date[res_date][res_node],res_path,agg=True);
+#                     agg_thread.run()
+#                     list_of_threads.append(agg_thread);
+#                 elif('bmp' in response):
+#                     bitmap_thread = ReadIntoMemory(self.__canvas_data_for_date[res_date][res_node],res_path,bitmap=True);
+#                     bitmap_thread.run();
+#                     list_of_threads.append(bitmap_thread);
+#                 counter+=1;
+#             except Exception as e:
+#                 print(e.message);
+#         
+#         for t in range(len(list_of_threads)):
+#             list_of_processes[t].join();
+#             
+#         end = datetime.datetime.now();
+#         diff = end - start;
+#         elapsed_ms = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000);
+#         print(elapsed_ms);  
+#         for i in range(len(list_of_processes)):
+#             list_of_processes[i].join();
         
     def check_available_data(self, date, raw=False, bitmap=False, aggregated=False):
         """ Function which checks if the data is available to stream to the client based on the parameters passed"""
@@ -113,7 +113,7 @@ class DataCreator(object):
         self.check_if_data_for_date_is_ready(date);
         
         if(raw == True):
-            data = self.__raw_data_for_date[date][node];
+            data = self.__raw_data_for_date[date][node-1];
             if data["indicator"] == "not_ready":
                 raise NotPresentError("data in this format is not ready");
             else:
@@ -150,7 +150,7 @@ class DataCreator(object):
         # only when list is empty
         if(cls.mercator_projected_coordinates == None):
             cls.mercator_projected_coordinates = [];
-            with open("C:\\Users\\walluser\\Desktop\\testing\\projected_coord_data.txt", "rb") as read_file:
+            with open("C:\\Users\\walluser\\javaWorkspace\\D3EventServer\\D3\\WebContent\\wall_coord_data.txt", "r") as read_file:
                 for line in read_file:
                     contents = line.split();
                     cls.mercator_projected_coordinates.append(contents);
