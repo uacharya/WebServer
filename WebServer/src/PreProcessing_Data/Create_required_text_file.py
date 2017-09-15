@@ -117,46 +117,56 @@ class Data():
                     station_longitude[station_id] = total_fields[3];
                     station_elevation[station_id] = total_fields[4];
                     
-            file_open_for_creating_dictionaries.close();
             
+            print("here ");
             self._create_final_global_dataset(total_dataset, countries_name_with_station_id, station_latitiude, station_longitude, station_elevation);
             
         except IOError:
             print("The file was not found for creating dictionaries");
+        finally:
+            file_open_for_creating_dictionaries.close();
         
     
     def _create_final_global_dataset(self, total_dataset, station_name, latitude, longitude, elevation):
         try:
             dataset_open = open(total_dataset, "r");
-            total_lines = dataset_open.readlines();
-            
-            output_file = "C:/Users/walluser/final_total_weather_dataset_preprocessed.txt";
+        
+            output_file = "C:\\Users\\walluser\\bash_scripts\\2014\\final_2014_dataset_preprocessed.txt";
             file_to_write_to = open(output_file, "w");
             
             file_to_write_to.write("STATION\tYEARMODA\tTEMPERATURE\tDEW\tSEALEVELPRESSURE\tSTATIONPRESSURE\tDENSITY\tVISIBILITY\tWINDSPEED\tMAXWINDSPEED\tWINDGUST\tMAXTEMP\tMINTEMP\tPRECIPITATION\tSNOWDEPTH\tLATITUDE\tLONGITUDE\tELEVATION");
             file_to_write_to.write("\n");
-            for line in total_lines:
+            for line in dataset_open:
                 if(station_name.get(line[:12]) != None):
                     name = station_name.get(line[:12]).strip();
 
                     temperature_in_kelvin = self.convert_temperature_to_kelvin(line[25:31]);
+                    
+                    if(temperature_in_kelvin==9999.9):
+                        continue;
+                    
 
                     if(float(line[57:64]) == 9999.9):
-                        station_pressure = self.get_station_pressure(line[46:53], elevation.get(line[:12]), temperature_in_kelvin)*100;
+                        station_pressure = self.get_station_pressure(line[46:53], elevation.get(line[:12]), temperature_in_kelvin);
+                        if station_pressure==9999.9:
+                            continue;
+                        else:
+                            station_pressure=station_pressure*100;
                     else:
                         station_pressure = float(line[57:64])*100;
-                    
-                    if(station_pressure == 9999.9 or temperature_in_kelvin == 9999.9):
-                        density = 0;
-                    else:
-                        density = self.get_the_density(station_pressure, temperature_in_kelvin);
                         
+                    wind_velocity=self.convert_to_ms(line[79:84]);
+                    
+                    if wind_velocity==999.9:
+                        continue;
+                    
+                    density = self.get_the_density(station_pressure, temperature_in_kelvin);    
                     sea_level_pressure_in_pascals = float(line[46:53])*100;
                         
                         
                     file_to_write_to.write(name + "\t" + line[14:23]
                         + "\t" + str(temperature_in_kelvin) + "\t" + line[36:42] + "\t" + str(sea_level_pressure_in_pascals) + "\t" + str(station_pressure) + "\t" + str(density) + "\t" + line[69:74] + "\t"
-                        + str(self.convert_to_ms(line[79:84])) + "\t" + str(self.convert_to_ms(line[89:94])) + "\t" + line[95:101] + "\t" + 
+                        + str(wind_velocity) + "\t" + str(self.convert_to_ms(line[89:94])) + "\t" + line[95:101] + "\t" + 
                         str(self.convert_temperature_to_kelvin(line[103:108])) + "\t" + str(self.convert_temperature_to_kelvin(line[111:116]))
                         + "\t" + line[118:123] + "\t" + line[125:131] + "\t" + latitude.get(line[:12]) + "\t" + longitude.get(line[:12]) + "\t" + elevation.get(line[:12]));
 
@@ -167,6 +177,8 @@ class Data():
             
         except IOError:
             print("total dataset file was not found");
+        finally:
+            dataset_open.close();
             
     
     def get_the_density(self, pressure, temperature):
