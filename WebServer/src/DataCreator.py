@@ -27,8 +27,16 @@ class DataCreator(object):
         self.__raw_data_for_date[date] = [];
         # add the indicator that raw data is ready for all the node for a date 
         for index in xrange(0, 9):
-            self.__raw_data_for_date[date].append({"indicator":"ready", "data":"C:\\D3\\temp\\"+str(date)+"\\node"+str(index+1)+"\\output.csv"});
+            self.__raw_data_for_date[date].append({"indicator":"ready", "data":None});
+        #array containing all the threaded objects reading files into memory
+        list_of_threads=[];  
+        for index in xrange(0,9):
+            raw_thread= ReadIntoMemory(self.__raw_data_for_date[date][index],"C:\\D3\\temp\\"+str(date)+"\\node"+str(index+1)+"\\output.csv",raw=True);
+            raw_thread.start();
+            list_of_threads.append(raw_thread); 
         
+        for t in list_of_threads:
+            t.join();
         # adding a key for the date which bitmap data is to be created  
         self.__canvas_data_for_date[date] = [];
         # add the indicator that bitmap data is not ready for all the node for a date 
@@ -41,47 +49,46 @@ class DataCreator(object):
         for _ in xrange(0, 9):
             self.__aggregated_data_for_date[date].append({"indicator":"not_ready", "data":None});
             
-#         list_of_processes=[];
-#         q= Queue();
-#         # call the class that should create data in two additional formats
-#         for i in range(9):
-#             agg_obj = DataInDifferentFormat(date,i+1, aggregate=q);
-#             agg_obj.start();
-#             list_of_processes.append(agg_obj);
-#             
+        list_of_processes=[];
+        q= Queue();
+        # call the class that should create data in two additional formats
+        for i in range(9):
+            agg_obj = DataInDifferentFormat(date,i+1, aggregate=q);
+            agg_obj.start();
+            list_of_processes.append(agg_obj);
+             
 #             bitmap_obj = DataInDifferentFormat(date,i+1, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
 #             bitmap_obj.start();
 #             list_of_processes.append(bitmap_obj);
-#                 
-#         import datetime;
-#         start = datetime.datetime.now();
-#         list_of_threads = [];
-#         counter=1;
-#         while counter<=len(list_of_processes):
-#             try:
-#                 response = q.get();
-#                 res_date,res_node,res_path = response['d'],response['n'],response['p'];
-#                 if('agg' in response):
-#                     agg_thread=ReadIntoMemory(self.__aggregated_data_for_date[res_date][res_node],res_path,agg=True);
-#                     agg_thread.run()
-#                     list_of_threads.append(agg_thread);
-#                 elif('bmp' in response):
-#                     bitmap_thread = ReadIntoMemory(self.__canvas_data_for_date[res_date][res_node],res_path,bitmap=True);
-#                     bitmap_thread.run();
-#                     list_of_threads.append(bitmap_thread);
-#                 counter+=1;
-#             except Exception as e:
-#                 print(e.message);
-#         
-#         for t in range(len(list_of_threads)):
-#             list_of_processes[t].join();
-#             
-#         end = datetime.datetime.now();
-#         diff = end - start;
-#         elapsed_ms = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000);
-#         print(elapsed_ms);  
-#         for i in range(len(list_of_processes)):
-#             list_of_processes[i].join();
+        list_of_threads=[];      
+        import datetime;
+        start = datetime.datetime.now();
+        counter=1;
+        while counter<=len(list_of_processes):
+            try:
+                response = q.get();
+                res_date,res_node,res_path = response['d'],response['n'],response['p'];
+                if('agg' in response):
+                    agg_thread=ReadIntoMemory(self.__aggregated_data_for_date[res_date][res_node-1],res_path,agg=True);
+                    agg_thread.start();
+                    list_of_threads.append(agg_thread);
+                elif('bmp' in response):
+                    bitmap_thread = ReadIntoMemory(self.__canvas_data_for_date[res_date][res_node-1],res_path,bitmap=True);
+                    bitmap_thread.run();
+                    list_of_threads.append(bitmap_thread);
+                counter+=1;
+            except Exception as e:
+                print(e.message);
+         
+        for t in range(len(list_of_threads)):
+            list_of_threads[t].join();
+             
+        end = datetime.datetime.now();
+        diff = end - start;
+        elapsed_ms = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000);
+        print(elapsed_ms);  
+        for i in range(len(list_of_processes)):
+            list_of_processes[i].join();
         
     def check_available_data(self, date, raw=False, bitmap=False, aggregated=False):
         """ Function which checks if the data is available to stream to the client based on the parameters passed"""
@@ -120,20 +127,20 @@ class DataCreator(object):
                 return data["data"];
             
         elif(bitmap == True):
-            data = self.__canvas_data_for_date[date][node];
+            data = self.__canvas_data_for_date[date][node-1];
             if data["indicator"] == "not_ready":
                 raise NotPresentError("data in this format is not ready");
             else:
                 return data["data"];
         elif(PNG == True):
-            data = self.__canvas_data_for_date[date][node];
+            data = self.__canvas_data_for_date[date][node-1];
             if data["indicator"] == "not_ready":
                 raise NotPresentError("data in this format is not ready");
             else:
                 return data["frames"];
         
         elif(aggregated == True):
-            data = self.__aggregated_data_for_date[date][node];
+            data = self.__aggregated_data_for_date[date][node-1];
             if data["indicator"] == "not_ready":
                 raise NotPresentError("data in this format is not ready");
             else:
@@ -163,10 +170,10 @@ class NotPresentError(Exception):
         
 
 
-class ReadIntoMemory(object):
+class ReadIntoMemory(Thread):
     """This class takes the data from the disk and writes in the memory after data has been created my multiple processes one for each node"""
     def __init__(self,data_dict,path,**kwargs):
-#         Thread.__init__(self);
+        Thread.__init__(self);
         self.data_holder =data_dict;
         self.path = path;
         self.arg = kwargs;
@@ -177,7 +184,14 @@ class ReadIntoMemory(object):
             with open(self.path,"rb") as f:
                 self.data_holder['data'] = json.dumps(cPickle.load(f));
             #indicating that reading in memory is finished for this data  
-            self.data_holder["indicator"]='ready';  
+            self.data_holder["indicator"]='ready'; 
+        
+        elif("raw" in self.arg):
+            #reading the csv files in the memory
+            with open(self.path,"r") as f:
+                self.data_holder['data']=f.read();
+                
+            self.data_holder["indicator"]='ready'; 
             
         elif("bitmap" in self.arg):
             #putting the line data into a object to stream

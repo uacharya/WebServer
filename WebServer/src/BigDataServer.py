@@ -56,8 +56,9 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 
                 start = self.path.index("_");
                 end = self.path.rfind("_");
-                date = int(self.path[start+1:end]);
-                data= data_creator.get_available_data(date,0,aggregated=True);
+                date_with_node = self.path[start+1:end].split(",");
+                
+                data= data_creator.get_available_data(int(date_with_node[0]),int(date_with_node[1]),aggregated=True);
                 #sending all the required headers
                 self.send_response(200,"ok");
                 self.send_header("Access-Control-Allow-Origin","null");
@@ -65,6 +66,9 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length",len(data));
                 self.send_header('Connection', 'keep-alive');
                 self.end_headers();
+                
+                if(date_with_node[1]=="9"):
+                    print(data);
                 # sending file to client via output stream
                 self.wfile.write(data) 
                 self.wfile.flush();
@@ -75,18 +79,17 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 end = self.path.rfind("_");
                 date_with_node = self.path[start+1:end].split(",");
                 
-                file_path= data_creator.get_available_data(int(date_with_node[0]),int(date_with_node[1]),raw=True);
+                file= data_creator.get_available_data(int(date_with_node[0]),int(date_with_node[1]),raw=True);
                 #sending all the required headers
                 self.send_response(200,"ok");
-                self.send_header("Access-Control-Allow-Origin","null");
+                self.send_header("Access-Control-Allow-Origin","*");
                 self.send_header('mimetype','application/json');
-                self.send_header("Content-Length",os.path.getsize(file_path));
+                self.send_header("Content-Length",len(file));
                 self.send_header('Connection', 'keep-alive');
                 self.end_headers();
                 
-                file_to_send = open(file_path, "rb");  # opening the file to send
                 # sending file to client via output stream
-                self.wfile.write(file_to_send.read()) 
+                self.wfile.write(file) ;
                 self.wfile.flush();
                 
             elif ("world-map" in self.path):
@@ -94,7 +97,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 file_path = "C:\\Users\\walluser\\javaWorkspace\\D3EventServer\\D3\\WebContent\\world-map.json";             
                 #sending all the required headers
                 self.send_response(200,"ok");
-                self.send_header("Access-Control-Allow-Origin","null");
+                self.send_header("Access-Control-Allow-Origin","*");
                 self.send_header('mimetype','application/json');
                 self.send_header("Content-Length",os.path.getsize(file_path));
                 self.send_header('Connection', 'keep-alive');
@@ -135,7 +138,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     response = "not_ready"
         #sending all the required headers to the client
         self.send_response(200,"ok");
-        self.send_header("Access-Control-Allow-Origin","null");
+        self.send_header("Access-Control-Allow-Origin","*");
         self.send_header('mimetype','text/plain');
         self.send_header("Content-Length",len(response));
         self.send_header('Connection', 'keep-alive');

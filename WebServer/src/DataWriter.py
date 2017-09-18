@@ -26,9 +26,14 @@ class DataInDifferentFormat(Process):
 
         elif("aggregate" in self.args):
             # the file to process
-            file_path = "C:\\Users\\walluser\\Desktop\\testing\\data" + str(self.date) + ".csv";
+            file_path = "C:\\D3\\temp\\"+str(self.date)+"\\node"+str(self.node)+"\\output.csv";
             # reading as dictionary all the csv rows so that the ones with same streamline ID can be grouped into one list
-            reader = csv.DictReader(open(file_path, 'rb', 2048));
+            reader = list(csv.DictReader(open(file_path, 'rb', 2048)));
+            #checking if the file is empty
+            if(len(reader)==0):
+                self.__write_data_to_file("");
+                return;
+    
             nested_data_based_on_id = defaultdict(list);  # for holding nested data for streamline based on flow ID between two stations
             # iterating over csv lines and grouping them according to same streamline ID
             for line in reader:
@@ -39,10 +44,10 @@ class DataInDifferentFormat(Process):
             
             for key, data in nested_data_based_on_id.iteritems():
                 total_data_points_for_a_flow = len(data);
-                dist_between = self.__calculate_distance(float(data[0]["S_Lat"]), float(data[0]["S_Lon"]), float(data[0]["D_Lat"]) , float(data[0]["D_Lon"]));
+                dist_between_in_degrees = self.__find_aggregated_points_between(float(data[0]["S_Lat"]), float(data[0]["S_Lon"]), float(data[0]["D_Lat"]) , float(data[0]["D_Lon"]));
                 # aggregate the data based on whether data points are more than the distance between source and destination so that data points per km can be shown
-                if(dist_between < total_data_points_for_a_flow):
-                    step = int(round(float(total_data_points_for_a_flow) / dist_between));
+                if(dist_between_in_degrees < total_data_points_for_a_flow):
+                    step = int(round(float(total_data_points_for_a_flow) / dist_between_in_degrees));
                     if(step > 1):
                         # creating aggregated data from the old data based on step size calculated
                         temp = data[::step];
@@ -71,21 +76,18 @@ class DataInDifferentFormat(Process):
             self.__write_data_to_file(aggregated_output_data);  
                            
             
-    def __calculate_distance(self, lat1, lon1, lat2, lon2):
-        """This function calculates distance between two points in earth based on their lat and lon using great circle formula os sphere"""
-        R = 6371;  # the radius of earth in km
-        rad_lat1 = math.pi * lat1 / 180;
-        rad_lat2 = math.pi * lat2 / 180;
-        rad_diff_lat = math.pi * (lat2 - lat1) / 180;
-        rad_diff_lon = math.pi * (lon2 - lon1) / 180;
-        a = math.sin(rad_diff_lat / 2) ** 2 + math.cos(rad_lat1) * math.cos(rad_lat2) * (math.sin(rad_diff_lon / 2) ** 2);
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-        # distance between the two points in km
-        return round(R * c);
+    def __find_aggregated_points_between(self,lat1,lon1,lat2,lon2):
+        """This function finds the difference in degrees between two stations and returns the largest difference between longitude difference or latitude difference"""
+        lat_diff = lat1-lat2 if lat1>=lat2 else lat2-lat1;
+        lon_diff = lon1-lon2 if lon1>=lon2 else lon2-lon1;
+        if(lon_diff>=lat_diff):
+            return lon_diff;
+        else:
+            return lat_diff
     
     def __write_data_to_file(self, obj):
         """This function writes the aggregated data in the form of dictionary to a json file for later use"""
-        file_path = "C:\\Users\\walluser\\Desktop\\testing\\data_json_" + str(self.date) + ".json";
+        file_path = "C:\\D3\\temp\\agg\\data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
         # writing the data to a json file for each date
         with open(file_path, "wb") as f:
             cPickle.dump(obj, f,protocol=cPickle.HIGHEST_PROTOCOL);
