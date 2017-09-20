@@ -54,8 +54,14 @@ class DataInDifferentFormat(Process):
             for key, data in nested_data_based_on_id.iteritems():
                 total_data_points_for_a_flow = len(data);
                 dist_between_in_degrees = self.__find_aggregated_points_between(float(data[0]["S_Lat"]), float(data[0]["S_Lon"]), float(data[0]["D_Lat"]) , float(data[0]["D_Lon"]));
-                if(dist_between_in_degrees==None):
-                    print(data[0],key);
+                
+                if(isinstance(dist_between_in_degrees,str)):
+                    if(dist_between_in_degrees=="lat"):
+                        dist_between_in_degrees = self.__get_diff_in_coord(data[0],data[total_data_points_for_a_flow-1],lat=True);
+                    else:
+                        dist_between_in_degrees = self.__get_diff_in_coord(data[0],data[total_data_points_for_a_flow-1],lon=True);
+
+                
                 # aggregate the data based on whether data points are more than the distance between source and destination so that data points per km can be shown
                 if(dist_between_in_degrees < total_data_points_for_a_flow):
                     step = int(round(float(total_data_points_for_a_flow) / dist_between_in_degrees));
@@ -86,7 +92,18 @@ class DataInDifferentFormat(Process):
             
             self.__write_data_to_file(aggregated_output_data);  
                            
+         
+    def __get_diff_in_coord(self,entry,exit,lat=False,lon=False):
+        """This function gets the aggregation points just in case source and destination both is not present in this node"""      
+        lat1,lon1 = float(entry["Wind_Lat"]),float(entry["Wind_Lon"]);
+        lat2,lon2 = float(exit["Wind_Lat"]),float(exit["Wind_Lon"]);
+        
+        if lat:
+            return lat1-lat2 if lat1>=lat2 else lat2-lat1;   
+        elif lon:
+            return lon1-lon2 if lon1>=lon2 else lon2-lon1;
             
+           
     def __find_aggregated_points_between(self,lat1,lon1,lat2,lon2):
         """This function finds the difference in degrees between two stations and returns the largest difference between longitude difference or latitude difference"""
         s_node = self.__find_node_location(lat1, lon1);
@@ -132,10 +149,7 @@ class DataInDifferentFormat(Process):
                     return b_lat-lat2;
                 
         elif (self.node!=s_node and self.node!=d_node):
-            if(lon_diff>=lat_diff):
-                return self.__get_limit_of_this_node(self.node,upper_lon=True) - self.__get_limit_of_this_node(self.node,lower_lon=True)
-            else:
-                return self.__get_limit_of_this_node(self.node,upper_lat=True) - self.__get_limit_of_this_node(self.node,lower_lat=True)
+            return "lat" if lat_diff>=lon_diff else "lon";
             
     
     def __get_limit_of_this_node(self,node,upper_lat=False,lower_lat=False,upper_lon=False,lower_lon=False):
