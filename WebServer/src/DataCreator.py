@@ -49,6 +49,8 @@ class DataCreator(object):
         for _ in xrange(0, 9):
             self.__aggregated_data_for_date[date].append({"indicator":"not_ready", "data":None});
             
+        print("done");
+            
         list_of_processes=[];
         q= Queue();
         # call the class that should create data in two additional formats
@@ -56,7 +58,7 @@ class DataCreator(object):
             agg_obj = DataInDifferentFormat(date,i+1, aggregate=q);
             agg_obj.start();
             list_of_processes.append(agg_obj);
-             
+              
 #             bitmap_obj = DataInDifferentFormat(date,i+1, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
 #             bitmap_obj.start();
 #             list_of_processes.append(bitmap_obj);
@@ -79,10 +81,10 @@ class DataCreator(object):
                 counter+=1;
             except Exception as e:
                 print(e.message);
-         
+          
         for t in range(len(list_of_threads)):
             list_of_threads[t].join();
-             
+              
         end = datetime.datetime.now();
         diff = end - start;
         elapsed_ms = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000);

@@ -67,8 +67,6 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_header('Connection', 'keep-alive');
                 self.end_headers();
                 
-                if(date_with_node[1]=="9"):
-                    print(data);
                 # sending file to client via output stream
                 self.wfile.write(data) 
                 self.wfile.flush();
@@ -171,8 +169,8 @@ if __name__ == '__main__':
     DataCreator.read_transformed_coordinates_to_array();
     #instance that creates data in different format for each date
     data_creator =  DataCreator();   
-    data_creator.create_data_for_date(19291128,aggregation_width=10);
-    print(data_creator.check_available_data(19291128,aggregated=True))
+    data_creator.create_data_for_date(20140130);
+    print(data_creator.check_available_data(20140130,aggregated=True))
     #continuing with the regular server active process for data creation
 
     
