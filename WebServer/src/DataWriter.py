@@ -19,15 +19,15 @@ class DataInDifferentFormat(Process):
         self.date = date;
         self.node = node;
         self.args = kwargs;
-        self.node_bounds = [(54.548,-180,79,-60.021),
-                            (54.548,-60,79,59.989),
-                            (54.548,60,79,180),
-                            (-2.155,-180,54.52,-60.021),
-                            (-2.155,-60,54.52,59.989),
-                            (-2.155,60,54.52,180),
-                            (-56.97,-180,-2.187,-60.021),
-                            (-56.97,60,-2.187,59.989),
-                            (-56.97,60,-2.187,180)];
+#         self.node_bounds = [(54.548,-180,79,-60.021),
+#                             (54.548,-60,79,59.989),
+#                             (54.548,60,79,180),
+#                             (-2.155,-180,54.52,-60.021),
+#                             (-2.155,-60,54.52,59.989),
+#                             (-2.155,60,54.52,180),
+#                             (-56.97,-180,-2.187,-60.021),
+#                             (-56.97,60,-2.187,59.989),
+#                             (-56.97,60,-2.187,180)];
         
     def run(self):
         if("bitmap" in self.args):
@@ -53,13 +53,12 @@ class DataInDifferentFormat(Process):
             
             for key, data in nested_data_based_on_id.iteritems():
                 total_data_points_for_a_flow = len(data);
-                dist_between_in_degrees = self.__find_aggregated_points_between(float(data[0]["S_Lat"]), float(data[0]["S_Lon"]), float(data[0]["D_Lat"]) , float(data[0]["D_Lon"]));
-                
-                if(isinstance(dist_between_in_degrees,str)):
-                    if(dist_between_in_degrees=="lat"):
-                        dist_between_in_degrees = self.__get_diff_in_coord(data[0],data[total_data_points_for_a_flow-1],lat=True);
-                    else:
-                        dist_between_in_degrees = self.__get_diff_in_coord(data[0],data[total_data_points_for_a_flow-1],lon=True);
+                diff_type = self.__find_aggregated_points_between(float(data[0]["S_Lat"]), float(data[0]["S_Lon"]), float(data[0]["D_Lat"]) , float(data[0]["D_Lon"]));
+        
+                if(diff_type=="lat"):
+                    dist_between_in_degrees = self.__get_diff_in_coord(data[0],data[total_data_points_for_a_flow-1],lat=True);
+                else:
+                    dist_between_in_degrees = self.__get_diff_in_coord(data[0],data[total_data_points_for_a_flow-1],lon=True);
 
                 
                 # aggregate the data based on whether data points are more than the distance between source and destination so that data points per km can be shown
@@ -94,7 +93,7 @@ class DataInDifferentFormat(Process):
                            
          
     def __get_diff_in_coord(self,entry,exit,lat=False,lon=False):
-        """This function gets the aggregation points just in case source and destination both is not present in this node"""      
+        """This function gets the aggregation points for a streamline in a node"""      
         lat1,lon1 = float(entry["Wind_Lat"]),float(entry["Wind_Lon"]);
         lat2,lon2 = float(exit["Wind_Lat"]),float(exit["Wind_Lon"]);
         
@@ -106,85 +105,45 @@ class DataInDifferentFormat(Process):
            
     def __find_aggregated_points_between(self,lat1,lon1,lat2,lon2):
         """This function finds the difference in degrees between two stations and returns the largest difference between longitude difference or latitude difference"""
-        s_node = self.__find_node_location(lat1, lon1);
-        d_node = self.__find_node_location(lat2, lon2);
         lat_diff = lat1-lat2 if lat1>=lat2 else lat2-lat1;
         lon_diff = lon1-lon2 if lon1>=lon2 else lon2-lon1;
 
-        if(s_node==d_node):
-            if(lon_diff>=lat_diff):
-                return lon_diff
-            else:
-                return lat_diff
-        elif (self.node==s_node):
-            if(lon_diff>=lat_diff):
-                if(lon1<=lon2):
-                    b_lon = self.__get_limit_of_this_node(self.node,upper_lon=True);
-                    return b_lon-lon1;
-                else:
-                    b_lon = self.__get_limit_of_this_node(self.node,lower_lon=True);
-                    return lon1-b_lon;
-            else:
-                if(lat1<=lat2):
-                    b_lat = self.__get_limit_of_this_node(self.node,upper_lat=True);
-                    return b_lat-lat1;
-                else:
-                    b_lat = self.__get_limit_of_this_node(self.node, lower_lat=True);
-                    return lat1-b_lat;
-                
-        elif(self.node==d_node):
-            if(lon_diff>=lat_diff):
-                if(lon1<=lon2):
-                    b_lon = self.__get_limit_of_this_node(self.node,lower_lon=True);
-                    return lon2-b_lon;
-                else:
-                    b_lon = self.__get_limit_of_this_node(self.node,upper_lon=True);
-                    return b_lon-lon2;
-            else:
-                if(lat1<=lat2):
-                    b_lat = self.__get_limit_of_this_node(self.node,lower_lat=True);
-                    return lat2-b_lat;
-                else:
-                    b_lat = self.__get_limit_of_this_node(self.node, upper_lat=True);
-                    return b_lat-lat2;
-                
-        elif (self.node!=s_node and self.node!=d_node):
-            return "lat" if lat_diff>=lon_diff else "lon";
+        return "lat" if lat_diff>=lon_diff else "lon";
             
     
-    def __get_limit_of_this_node(self,node,upper_lat=False,lower_lat=False,upper_lon=False,lower_lon=False):
-        """This function returns bound of a node in terms of lat and lon as asked by user"""
-        temp  =self.node_bounds[node-1];
-        if(lower_lat):
-            return temp[0];
-        elif(lower_lon):
-            return temp[1];
-        elif (upper_lat):
-            return temp[2]
-        elif (upper_lon):
-            return temp[3];
-            
-    def __find_node_location(self,latitude,longitude):
-        """this function returns a location where the wind line belongs to among all of the monitors based on mercator projection"""
-
-        if((latitude <= 79 and latitude >= 54.548) and(longitude >= -180 and longitude <= -60.021)):
-            return 1;
-        elif((latitude <= 79 and latitude >= 54.548) and(longitude >=-60 and longitude <= 59.989)):
-            return 2;
-        elif((latitude <= 79 and latitude >= 54.548) and(longitude >=60 and longitude <= 180)):
-            return 3;
-        elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -180 and longitude <= -60.021)):
-            return 4;
-        elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -60 and longitude <= 59.989)):
-            return 5;
-        elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= 60 and longitude <= 180)):
-            return 6;
-        elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -180 and longitude <= -60.021)):
-            return 7;
-        elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -60 and longitude <= 59.989)):
-            return 8;
-        elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= 60 and longitude <= 180)):
-            return 9;
+#     def __get_limit_of_this_node(self,node,upper_lat=False,lower_lat=False,upper_lon=False,lower_lon=False):
+#         """This function returns bound of a node in terms of lat and lon as asked by user"""
+#         temp  =self.node_bounds[node-1];
+#         if(lower_lat):
+#             return temp[0];
+#         elif(lower_lon):
+#             return temp[1];
+#         elif (upper_lat):
+#             return temp[2]
+#         elif (upper_lon):
+#             return temp[3];
+#             
+#     def __find_node_location(self,latitude,longitude):
+#         """this function returns a location where the wind line belongs to among all of the monitors based on mercator projection"""
+# 
+#         if((latitude <= 79 and latitude >= 54.548) and(longitude >= -180 and longitude <= -60.021)):
+#             return 1;
+#         elif((latitude <= 79 and latitude >= 54.548) and(longitude >=-60 and longitude <= 59.989)):
+#             return 2;
+#         elif((latitude <= 79 and latitude >= 54.548) and(longitude >=60 and longitude <= 180)):
+#             return 3;
+#         elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -180 and longitude <= -60.021)):
+#             return 4;
+#         elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -60 and longitude <= 59.989)):
+#             return 5;
+#         elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= 60 and longitude <= 180)):
+#             return 6;
+#         elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -180 and longitude <= -60.021)):
+#             return 7;
+#         elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -60 and longitude <= 59.989)):
+#             return 8;
+#         elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= 60 and longitude <= 180)):
+#             return 9;
     
     def __write_data_to_file(self, obj):
         """This function writes the aggregated data in the form of dictionary to a json file for later use"""

@@ -48,9 +48,7 @@ class DataCreator(object):
         # add the indicator that bitmap data is not ready for all the node for a date 
         for _ in xrange(0, 9):
             self.__aggregated_data_for_date[date].append({"indicator":"not_ready", "data":None});
-            
-        print("done");
-            
+                        
         list_of_processes=[];
         q= Queue();
         # call the class that should create data in two additional formats
