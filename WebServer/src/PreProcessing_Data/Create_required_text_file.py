@@ -111,7 +111,7 @@ class Data():
             for counter in xrange(len(total_list_of_stations)):
                 if(counter > 0):
                     total_fields = total_list_of_stations[counter].split("\t");
-                    station_id = total_fields[0].split(' ')[0];
+                    station_id = total_fields[0].strip();
                     if not station_id in countries_name_with_station_id:
                         countries_name_with_station_id[station_id] = total_fields[1];
                         station_latitiude[station_id] = total_fields[2];
@@ -132,15 +132,15 @@ class Data():
         try:
             dataset_open = open(total_dataset, "r");
         
-            output_file = "C:\\Users\\walluser\\final_total_weather_dataset_preprocessed_1113.txt";
+            output_file = "C:\\Users\\walluser\\bash_scripts\\2014\\final_2014_dataset_preprocessed.txt";
             file_to_write_to = open(output_file, "w");
             
             file_to_write_to.write("STN\tSTATION\tYEARMODA\tTEMPERATURE\tDEW\tSEALEVELPRESSURE\tSTATIONPRESSURE\tDENSITY\tVISIBILITY\tWINDSPEED\tMAXWINDSPEED\tWINDGUST\tMAXTEMP\tMINTEMP\tPRECIPITATION\tSNOWDEPTH\tLATITUDE\tLONGITUDE\tELEVATION");
             file_to_write_to.write("\n");
             for line in dataset_open:
-                if(station_name.get(line[:6].strip()) != None):
-                    name = station_name.get(line[:6].strip()).strip();
-                    id = line[:6].strip();
+                if(station_name.get(line[:12].strip()) != None):
+                    name = station_name.get(line[:12].strip()).strip();
+                    id = line[:12].strip();
 
                     temperature_in_kelvin = self.convert_temperature_to_kelvin(line[25:31]);
                     
@@ -149,7 +149,7 @@ class Data():
                     
 
                     if(float(line[57:64]) == 9999.9):
-                        station_pressure = self.get_station_pressure(line[46:53], elevation.get(line[:6].strip()), temperature_in_kelvin);
+                        station_pressure = self.get_station_pressure(line[46:53], elevation.get(line[:12].strip()), temperature_in_kelvin);
                         if station_pressure==9999.9:
                             continue;
                         else:
@@ -170,7 +170,7 @@ class Data():
                         + "\t" + str(temperature_in_kelvin) + "\t" + line[36:42] + "\t" + str(sea_level_pressure_in_pascals) + "\t" + str(station_pressure) + "\t" + str(density) + "\t" + line[69:74] + "\t"
                         + str(wind_velocity) + "\t" + str(self.convert_to_ms(line[89:94])) + "\t" + line[95:101] + "\t" + 
                         str(self.convert_temperature_to_kelvin(line[103:108])) + "\t" + str(self.convert_temperature_to_kelvin(line[111:116]))
-                        + "\t" + line[118:123] + "\t" + line[125:131] + "\t" + latitude.get(line[:6].strip()) + "\t" + longitude.get(line[:6].strip()) + "\t" + elevation.get(line[:6].strip()));
+                        + "\t" + line[118:123] + "\t" + line[125:131] + "\t" + latitude.get(line[:12].strip()) + "\t" + longitude.get(line[:12].strip()) + "\t" + elevation.get(line[:12].strip()));
 
 
             file_to_write_to.flush();
