@@ -2,62 +2,58 @@ from pyspark import SparkConf,SparkContext;
 import math;
 
 hbase = None #global hbase connection object
-# splits the line into individual dimension and creates a dictionary with key value pair 
-# with key being the date and value being the station's weather variable
+
 def create_required_datewise_data(line):
-    
+    """splits the line into individual dimension and creates a dictionary with key value pair with key being the date and value being the station's weather variable"""
     data = line.split("\t");
     
-    key = str(data[1]);
+    key = str(data[2]).strip();
      
-    data_features = {"Date":key, "Station_Name":str(data[0]), "Temperature":str(data[2]), "Station_Pressure":str(data[5]), "Station_Density":str(data[6]), "Station_Wind_Velocity":str(data[8]),
-                       "Station_Latitude":str(data[15]), "Station_Longitude":str(data[16]), "Station_Elevation":str(data[17])};
+    data_features = {"Date":key,"Station_Id":str(data[0]), "Station_Name":str(data[1]), "Temperature":str(data[3]), "Station_Pressure":str(data[6]), "Station_Density":str(data[7]), "Station_Wind_Velocity":str(data[9]),
+                       "Station_Latitude":str(data[16]), "Station_Longitude":str(data[17]), "Station_Elevation":str(data[18])};
     
     
     return (key, data_features);
 
-# this function creates the data analyzing the two stations in comparison
 def create_data_from_station_data(first, second):
+    """this function creates the data analyzing the two stations in comparison"""
     global hbase; #one hdfs connection per executor
     
     if(hbase==None):
         import happybase; 
         hbase = happybase.ConnectionPool(size=1,host='cshadoop.boisestate.edu');
-        print('inside thread');
     
     date_for_comparision = first["Date"].strip();
     
     dataset = {'node1':[],'node2':[],'node3':[],'node4':[],'node5':[],'node6':[],'node7':[],'node8':[],'node9':[]};       
-    for data in broadcast_variable.value:
-        if data[0].strip() == date_for_comparision:
-            compare_data_between(date_for_comparision, first, data[1],dataset);
-        else:
-            continue;
     
-    from datetime import datetime;
-    with hbase.connection() as db:
-        for key in dataset:
-            if(len(dataset[key])!=0):
-                t = db.table(key.encode()); # table connection to update specific data table
-                with t.batch(batch_size=10000) as b:
-                    for data in dataset[key]:
-                        row = datetime.now().strftime("%H%M%S%f");
-                        b.put(row.encode(),{'dataset:Date'.encode():data[0].encode(),'dataset:ID'.encode():data[1].encode(),'dataset:Source'.encode():data[2].encode(),
-                                     'dataset:Destination'.encode():data[3].encode(),'dataset:S_Lat'.encode():data[4].encode(),'dataset:S_Lon'.encode():data[5].encode(),
-                                     'dataset:D_Lat'.encode():data[6].encode(),'dataset:D_Lon'.encode():data[7].encode(),'dataset:Wind_Lat'.encode():data[8].encode(),
-                                     'dataset:Wind_Lon'.encode():data[9].encode(),'dataset:Wind_Velocity'.encode():data[10].encode()});
-                    
+    for data in broadcast_variable.value[date_for_comparision]:
+        compare_data_between(date_for_comparision, first, data,dataset);
+    
+#     from datetime import datetime;
+#     with hbase.connection() as db:
+#         for key in dataset:
+#             if(len(dataset[key])!=0):
+#                 t = db.table(key.encode()); # table connection to update specific data table
+#                 with t.batch(batch_size=10000) as b:
+#                     for data in dataset[key]:
+#                         row = datetime.now().strftime("%H%M%S%f");
+#                         b.put(row.encode(),{'dataset:Date'.encode():data[0].encode(),'dataset:ID'.encode():data[1].encode(),'dataset:Source'.encode():data[2].encode(),
+#                                      'dataset:Destination'.encode():data[3].encode(),'dataset:S_Lat'.encode():data[4].encode(),'dataset:S_Lon'.encode():data[5].encode(),
+#                                      'dataset:D_Lat'.encode():data[6].encode(),'dataset:D_Lon'.encode():data[7].encode(),'dataset:Wind_Lat'.encode():data[8].encode(),
+#                                      'dataset:Wind_Lon'.encode():data[9].encode(),'dataset:Wind_Velocity'.encode():data[10].encode()});
+#                     
     
     dataset.clear(); #clearing the dictionary
     
     # append over here after all the global variable has been made        
     return second;
 
-# this function does the detailed comparing of a pair of stations using equations of physics to create wind flow simulation
 def compare_data_between(date, first_station, second_station,dataset):
+    """this function does the detailed comparing of a pair of stations using equations of physics to create wind flow simulation"""
     global hbase;
     with hbase.connection() as db:
-        table = db.table('dataChecker'.encode()); # table connection to update data table
+        table = db.table('fChecker'.encode()); # table connection to update data table
         if first_station != second_station:
             first_station_pressure = float(first_station["Station_Pressure"]);
             second_station_pressure = float(second_station["Station_Pressure"]);
@@ -68,25 +64,32 @@ def compare_data_between(date, first_station, second_station,dataset):
             first_station_air_density = float(first_station["Station_Density"]);
             second_station_air_density = float(second_station["Station_Density"]);
             
+            
             if(first_station_pressure > second_station_pressure):
-                source_id = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
-                destination_id = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
-                ID = source_id+"_to_"+destination_id;
+                source_id = first_station['Station_Id'].strip();
+                destination_id = second_station['Station_Id'].strip();
+                source_name = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
+                destination_name = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
+                ID = source_id+"t"+destination_id;
                 #checking if the data for particular pair has already been written
-                data='';
-                res = table.row(date.encode());
-                if(len(res.keys())==0):
-                    pass;
-                else:
-                    data = res['flow:data'].decode();
-                    
-                if ID in data:
+                data=None;
+                data = table.row(ID.encode(),columns=[('f:'+date).encode()]);
+
+                if(data):
                     return;
                 else:
-                    content = data + ID+',';
-                    table.delete(date.encode());
-                    table.put(date.encode(),{'flow:data'.encode():content.encode()});
-                    
+                    table.put(ID.encode(),{('f:'+date).encode():'y'.encode()});
+#                 filt = "SingleColumnValueFilter('flow','"+date+"',=,'binaryprefix:"+ID+"',true,true)";
+#                 res_generator = table.scan(filter=filt,limit=1);
+#                 for d in res_generator:
+#                     data = d;              
+#                 if(data):
+#                     return;
+#                 else:
+#                     from datetime import datetime;
+#                     row = datetime.now().strftime("%H%M%S%f");
+#                     table.put(row.encode(),{('flow:'+date).encode():ID.encode()}); 
+                
                 # getting the final destination wind velocity using bernoulli principle
                 temp_value = 2 * (((first_station_pressure / first_station_air_density) - (second_station_pressure / second_station_air_density)) + 
                                             (717 * (float(first_station["Temperature"]) - float(second_station["Temperature"]))) + 
@@ -95,27 +98,38 @@ def compare_data_between(date, first_station, second_station,dataset):
                 destination_wind_velocity = math.sqrt(abs(temp_value));
                 
                 wind_flow_acceleration = get_acceleration_for_wind_flow(first_station, second_station);
+                
+                if(wind_flow_acceleration==None):
+                    return;
+                
                 time_required_to_reach_destination_in_seconds = (destination_wind_velocity - first_station_wind_velocity) / wind_flow_acceleration[0];
-                create_simulation_data(date,ID,source_id,destination_id, first_station, second_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds,destination_wind_velocity,dataset);
+                create_simulation_data(date,ID,source_name,destination_name, first_station, second_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds,destination_wind_velocity,dataset);
                 
             elif second_station_pressure>first_station_pressure:
-                source_id = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
-                destination_id = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
-                ID = source_id+"_to_"+destination_id;
+                source_id= second_station['Station_Id'].strip();
+                destination_id = first_station['Station_Id'].strip();
+                source_name = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
+                destination_name = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
+                ID = source_id+"t"+destination_id;
                 #checking if the data for particular pair has already been written
-                data='';
-                res = table.row(date.encode());
-                if(len(res.keys())==0):
-                    pass;
-                else:
-                    data = res['flow:data'].decode();
-                    
-                if ID in data:
+                data=None;
+                data = table.row(ID.encode(),columns=[('f:'+date).encode()]);
+
+                if(data):
                     return;
                 else:
-                    content = data + ID+',';
-                    table.delete(date.encode());
-                    table.put(date.encode(),{'flow:data'.encode():content.encode()});
+                    table.put(ID.encode(),{('f:'+date).encode():'y'.encode()});
+
+#                 filt = "SingleColumnValueFilter('flow','"+date+"',=,'binaryprefix:"+ID+"',true,true)";
+#                 res_generator = table.scan(filter=filt,limit=1);
+#                 for d in res_generator:
+#                     data = d;              
+#                 if(data):
+#                     return;
+#                 else:
+#                     from datetime import datetime;
+#                     row = datetime.now().strftime("%H%M%S%f");
+#                     table.put(row.encode(),{('flow:'+date).encode():ID.encode()}); 
     
                 # getting the final destination wind velocity using bernoulli principle
                 temp_value = 2 * (((second_station_pressure / second_station_air_density) - (first_station_pressure / first_station_air_density)) + 
@@ -126,19 +140,30 @@ def compare_data_between(date, first_station, second_station,dataset):
                 destination_wind_velocity = math.sqrt(abs(temp_value));
                 
                 wind_flow_acceleration = get_acceleration_for_wind_flow(second_station, first_station);
+                
+                if(wind_flow_acceleration==None):
+                    return;
+                
                 time_required_to_reach_destination_in_seconds = (destination_wind_velocity - second_station_wind_velocity) / wind_flow_acceleration[0];
-                create_simulation_data(date,ID,source_id,destination_id, second_station, first_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds,destination_wind_velocity,dataset);
+                create_simulation_data(date,ID,source_name,destination_name, second_station, first_station, wind_flow_acceleration, time_required_to_reach_destination_in_seconds,destination_wind_velocity,dataset);
                
+        else:
+            return;
+                  
     
 
 # this function calculates the acceleration of the wind flow from one station to another based on pressure difference        
 def get_acceleration_for_wind_flow(source, destination):
+    """this function calculates the acceleration of the wind flow from one station to another based on pressure difference"""
     distance_betweem_two_stations = calculate_distance(float(source["Station_Latitude"]), float(source["Station_Longitude"]), float(destination["Station_Latitude"]), float(destination["Station_Longitude"]));    
     average_density = (float(source["Station_Density"]) + float(destination["Station_Density"])) / 2;
     pressure_difference = float(source["Station_Pressure"]) - float(destination["Station_Pressure"]);
+    
+    if(distance_betweem_two_stations[1]==0.0):
+        return None;
     # acceleration of a wind flow from source to destination
     acceleration = (1 / average_density) * (pressure_difference / distance_betweem_two_stations[1]);
-    
+
     return (acceleration, distance_betweem_two_stations[0]); 
     
 # this function calculates distance between two points in earth based on their lat and lon using great circle formula os sphere
@@ -154,16 +179,16 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return (c, R * c);
     
 
-def create_simulation_data(date,ID,source_id,destination_id, source_station, destination_station, acceleration, time_to_reach,final_velocity,dataset):
+def create_simulation_data(date,ID,source_name,destination_name, source_station, destination_station, acceleration, time_to_reach,final_velocity,dataset):
     """This function writes the data into each node data holder by performing a bit of calculation first"""
     start_velocity = initial_wind_velocity = float(source_station["Station_Wind_Velocity"]);
-    total_time = int(math.ceil(acceleration[1] * 6371)); #distance in km between points
+    total_time = int(math.ceil(acceleration[1] * 3959 )); #distance in miles between points
     time_in_seconds_per_step = time_to_reach/float(total_time);
     counter = 1;
     # getting all the locations that are in between source and destination wind flow
     intermediate_locations = get_intermediate_wind_locations(source_station, destination_station, acceleration[1], total_time);
     # writing first data so that first line starts from center of the source station
-    write_to_csv_data(date,ID,source_id,destination_id,source_station["Station_Latitude"], source_station["Station_Longitude"], destination_station["Station_Latitude"],destination_station["Station_Longitude"],intermediate_locations[0],start_velocity,dataset);
+    write_to_csv_data(date,ID,source_name,destination_name,source_station["Station_Latitude"], source_station["Station_Longitude"], destination_station["Station_Latitude"],destination_station["Station_Longitude"],intermediate_locations[0],start_velocity,dataset);
     
     while counter <= total_time:
         # finding the wind location after coriolis deflection for each point in the route
@@ -171,21 +196,20 @@ def create_simulation_data(date,ID,source_id,destination_id, source_station, des
         # calculating the new velocity for each intervals in between until the wind reaches the destination
         last_wind_velocity = find_new_wind_velocity(start_velocity, acceleration[0], (counter*time_in_seconds_per_step));
         # writing the data to the file after finding the required attributes for a particular wind flow line
-        write_to_csv_data(date,ID, source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], actual_wind_location, last_wind_velocity,dataset);
+        write_to_csv_data(date,ID, source_name,destination_name,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], actual_wind_location, last_wind_velocity,dataset);
         
         initial_wind_velocity = last_wind_velocity;
         counter += 1;
     
 #     write_to_csv_data(date,ID,source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], intermediate_locations[len(intermediate_locations) - 1], final_velocity);
-           
+                 
        
-# this function finds the velocity value for a particular location of a wind flow based on time that the wind started to flow from the sources            
-def find_new_wind_velocity(v0, a, t):
+def find_new_wind_velocity(v0, a, t): 
+    """this function finds the velocity value for a particular location of a wind flow based on time that the wind started to flow from the sources"""
     return v0 + (a * t)
             
-# this function produces all the locations that lies in the arc distance i.e. distance between two lines on earth based on great circle distance
 def get_intermediate_wind_locations(source, destination, distance_in_radians, total_time):
-    
+    """this function produces all the locations that lies in the arc distance i.e. distance between two lines on earth based on great circle distance"""
     initial_wind_location = [float(source["Station_Latitude"]), float(source["Station_Longitude"])];
     final_wind_location = [float(destination["Station_Latitude"]), float(destination["Station_Longitude"])];
     # list that stores coordinates of all the locations that is supposed to be visualized as line for wind flow
@@ -216,8 +240,8 @@ def get_intermediate_wind_locations(source, destination, distance_in_radians, to
     return intermediate_locations;
         
 
-# this function gives actual location coordinate after coriolis deflection takes place
 def find_new_wind_location(velocity, counter, list_of_locations):
+    """this function gives actual location coordinate after coriolis deflection takes place"""
     current_location = list_of_locations[counter];
     current_latitute = math.radians(current_location[0]);
     start_latitude = math.radians(list_of_locations[counter-1][0]);
@@ -233,10 +257,11 @@ def find_new_wind_location(velocity, counter, list_of_locations):
     
     new_lon = float(current_location[1]) - total_deflection_in_degree_of_longitude;
     # returning deflected new coordinate of the location
-    return [current_location[0], new_lon];
+    return (current_location[0], new_lon);
     
 # this function writes the data to each csv file for each node of wall display    
 def write_to_csv_data(date,ID, source_id,destination_id,source_lat,source_lon,destination_lat,destination_lon, coordinates, velocity,dataset):
+    """This function writes data for a particular stream flow into every single node data holder list for writing them later to hdfs""" 
     which_node_does_location_belong_to = find_node_location(coordinates);
     content = [date,ID,source_id,destination_id,source_lat,source_lon,destination_lat,destination_lon,str(coordinates[0]),str(coordinates[1]),str(velocity)];
   
@@ -287,11 +312,13 @@ def find_node_location(coordinates):
 if __name__ == '__main__':
     
     import happybase;
+    from collections import defaultdict;
     # configure the spark environment
     sparkConf = SparkConf().setAppName("Simulating Streamline");
+    sparkConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
     sc = SparkContext(conf=sparkConf);
 
-    distributed_dataset = sc.textFile("hdfs:/user/uacharya/preprocessed_combined.txt",minPartitions=45);
+    distributed_dataset = sc.textFile("hdfs:/user/uacharya/subset_small_dataset.txt",minPartitions=45);
     print("this is the driver container");
     # getting the header of the whole dataset
     header = distributed_dataset.first();
@@ -299,10 +326,16 @@ if __name__ == '__main__':
     distributed_dataset = distributed_dataset.filter(lambda d: d != header);
     # mapping the data to prepare for processing
     data_in_required_format = distributed_dataset.map(create_required_datewise_data);
+    data_in_required_format.cache();
     #collecting all the dataset for broadcasting
     broadcast_data = data_in_required_format.collect();
+    print(str(len(broadcast_data))+" driver program");
+    broadcast_data_based_on_id = defaultdict(list);  # for holding nested data for streamline based on flow ID between two stations
+    
+    for line in broadcast_data:
+        broadcast_data_based_on_id[line[0].strip()].append(line[1]);
     #broadcasting the entire dataset  
-    broadcast_variable = sc.broadcast(broadcast_data);
+    broadcast_variable = sc.broadcast(broadcast_data_based_on_id);
     
     database = happybase.ConnectionPool(size=1,host='cshadoop.boisestate.edu');
     #getting a connection from the pool
@@ -313,7 +346,7 @@ if __name__ == '__main__':
                 'dataset'.encode():dict()
                 });
                 
-        db.create_table('dataChecker'.encode(),{'flow'.encode():dict()});
+        db.create_table('fChecker'.encode(),{'f'.encode():dict(max_versions=1,in_memory=True)});
     
     temp = set(data_in_required_format.keys().collect());
     #getting keys for use in future
