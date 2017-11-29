@@ -57,21 +57,19 @@ def create_data_from_station_data(first, second):
     
     dataset = {'node1':[],'node2':[],'node3':[],'node4':[],'node5':[],'node6':[],'node7':[],'node8':[],'node9':[]};
     
-    for data in broadcast_variable.value[date_for_comparision]:
+    for data in broadcast_variable.value:
         compare_data_between(date_for_comparision, first, data,dataset);
 
-    
-    
-    for key in dataset:
-        if(len(dataset[key])!=0):
-            content = "\n".join(dataset[key]);
-            while(True):
-                try:
-                    hdfs.append_file('user/uacharya/simulation/'+date_for_comparision+'/'+key+'/output.csv',content,buffersize=4096);
-                    break;
-                except Exception:
-                    time.sleep(0.5);
-                    continue;
+#     for key in dataset:
+#         if(len(dataset[key])!=0):
+#             content = "\n".join(dataset[key]);
+#             while(True):
+#                 try:
+#                     hdfs.append_file('user/uacharya/simulation/'+date_for_comparision+'/'+key+'/output.csv',content,buffersize=4096);
+#                     break;
+#                 except Exception:
+#                     time.sleep(0.5);
+#                     continue;
     
     dataset.clear(); #clearing the dictionary
     # append over here after all the global variable has been made        
@@ -160,7 +158,7 @@ def compare_data_between(date, first_station, second_station,dataset):
                 #checking if the data for particular pair has already been written
                 data=None;
                 data = table.row(ID.encode(),columns=[('f:'+date).encode()]);
-
+ 
                 if(data):
                     return;
                 else:
@@ -376,53 +374,60 @@ def find_node_location(coordinates):
     
             
 if __name__ == '__main__':
-    from collections import defaultdict;
     import happybase;
     # configure the spark environment
     sparkConf = SparkConf().setAppName("Simulating Streamline");
-    sparkConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
+    sparkConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     sc = SparkContext(conf=sparkConf);
-    sc.addPyFile("module.zip"); #adding pywebhdfs to python path
+    sc.addPyFile("module.zip");
 #     from pywebhdfs.webhdfs import PyWebHdfsClient;
-    distributed_dataset = sc.textFile("hdfs:/user/uacharya/subset_small_dataset.txt",minPartitions=60);
+    distributed_dataset = sc.textFile("hdfs:/user/uacharya/subset_small_dataset.txt",use_unicode=False,minPartitions=1720);
     print("this is the driver container");
     # getting the header of the whole dataset
     header = distributed_dataset.first();
-    # filtering the header out of the data 
+    # filtering the header out of the data
     distributed_dataset = distributed_dataset.filter(lambda d: d != header);
     # mapping the data to prepare for processing
     data_in_required_format = distributed_dataset.map(create_required_datewise_data);
     data_in_required_format.cache();
-    #collecting all the dataset for broadcasting
-    broadcast_data = data_in_required_format.collect();
-    print(str(len(broadcast_data))+" driver program");
-    broadcast_data_based_on_id = defaultdict(list);  # for holding nested data for streamline based on flow ID between two stations
-
-    for line in broadcast_data:
-        broadcast_data_based_on_id[line[0].strip()].append(line[1]);
-    #broadcasting the entire dataset
-    broadcast_variable = sc.broadcast(broadcast_data_based_on_id);
+    #collecting keys to do batch processing based on keys
+    temp = set(data_in_required_format.keys().collect());
+    print("total keys "+str(len(temp)));
+    #sorting keys to create data in chronological order based on date
+    sorted_keys = sorted(temp,key=int);
     #connecting to database for writing checker data
     database = happybase.ConnectionPool(size=1,host='cshadoop.boisestate.edu');
     #getting a connection from the pool
     with database.connection() as db:
         db.create_table('fChecker'.encode(),{'f'.encode():dict(max_versions=1,in_memory=True)});
-
-    temp = set(data_in_required_format.keys().collect());
-    print("total keys "+str(len(temp)));
-    #getting keys for use in future
-    sorted_keys = sorted(temp,key=int);
-    #writing the keys value to a file
-#     hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya');
-#     keys_data = str(sorted_keys);
-#     hdfs.create_file('user/uacharya/keys.txt',keys_data);
-    # analyzing the stations weather variables based on each date to create the simulation data for wind flow
-    final_data_after_creating_files = data_in_required_format.reduceByKey(create_data_from_station_data);
-
-    x = final_data_after_creating_files.count();
-    # erasing the broadcast data set after use from everywhere
-    broadcast_variable.unpersist(blocking=True);
-
+    #creating batch processing with new rdd each iteration based on key values
+    for key in sorted_keys:
+        print(key);
+        keyed_rdd = data_in_required_format.filter(lambda t: t[0]==key).map(lambda t: t[1]).coalesce(840, shuffle=True);
+        keyed_rdd.cache();
+        #collecting all the dataset for broadcasting
+        broadcast_data = keyed_rdd.collect();
+        print(str(len(broadcast_data))+" driver program");
+        #l = keyed_rdd.glom().map(len).collect()  # get length of each partition
+        #print(min(l), max(l), sum(l)/len(l), len(l))  # check if skewed
+        #broadcasting the entire keyed dataset
+        broadcast_variable = sc.broadcast(broadcast_data);
+        # analyzing the stations weather variables based on each date to create the simulation data for wind flow
+        final_data_after_creating_files = keyed_rdd.treeReduce(create_data_from_station_data,depth=3);
+        #x = final_data_after_creating_files.count();
+        print("the final result for {0} is {1}".format(key,final_data_after_creating_files));
+        # erasing the broadcast data set after use from everywhere
+        broadcast_variable.unpersist(blocking=True);
+        #erasing cached keyed rdd
+        keyed_rdd.unpersist();
+        global hbase;
+        global hdfs;
+        #setting both global variables for each task to None so that these connection objects are only created inside executor and not serialized when sending task to them.
+        hbase = hdfs = None;
+        
     sc.stop();
+
+
+
 
 
