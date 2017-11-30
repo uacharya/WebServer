@@ -29,14 +29,14 @@ class DataCreator(object):
         for index in xrange(0, 9):
             self.__raw_data_for_date[date].append({"indicator":"ready", "data":None});
         #array containing all the threaded objects reading files into memory
-        list_of_threads=[];  
-        for index in xrange(0,9):
-            raw_thread= ReadIntoMemory(self.__raw_data_for_date[date][index],"C:\\D3\\temp\\"+str(date)+"\\node"+str(index+1)+"\\output.csv",raw=True);
-            raw_thread.start();
-            list_of_threads.append(raw_thread); 
-        
-        for t in list_of_threads:
-            t.join();
+#         list_of_threads=[];  
+#         for index in xrange(0,9):
+#             raw_thread= ReadIntoMemory(self.__raw_data_for_date[date][index],"C:\\D3\\temp\\"+str(date)+"\\node"+str(index+1)+"\\output.csv",raw=True);
+#             raw_thread.start();
+#             list_of_threads.append(raw_thread); 
+#         
+#         for t in list_of_threads:
+#             t.join();
         # adding a key for the date which bitmap data is to be created  
         self.__canvas_data_for_date[date] = [];
         # add the indicator that bitmap data is not ready for all the node for a date 
