@@ -8,11 +8,13 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import SocketServer,urlparse;
 from DataCreator import DataCreator,NotPresentError;
 from threading import Thread;
-# Create custom HTTPRequestHandler class
+
 class CustomHTTPRequestHandler(BaseHTTPRequestHandler): 
-    """ Custom http request handler which process request and sends response to the client based on the request type"""
-    # method for handling the http get request from the client used for exposing get data api from this server
+    """ Custom http request handler class which process request and sends response to the client based on the request type"""
+    
     def do_GET(self):
+        """ method for handling the http get request from the client used for exposing get data api from this server and stream the requested data based on
+        date and type """
         try:
             #extracting path and query string from get method
             path, _ ,query_string = self.path.partition('?');
@@ -21,7 +23,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             
             if(queries['op'][0]=='OPEN'):
                 
-                if ("world-map.json" in path):
+                if ("world-map" in path):
                     file_path = "C:\\Users\\walluser\\javaWorkspace\\D3EventServer\\D3\\WebContent\\world-map.json";             
                     #sending all the required headers
                     self.send_response(200,"ok");
@@ -36,7 +38,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     self.wfile.write(file_to_send.read()) 
                     self.wfile.flush();
                     
-                elif ("data.csv" in path or "data.json" in path):
+                elif ("data" in path):
                     self._send_data_to_client(queries);
                 
             else:
@@ -72,12 +74,24 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(output);
             self.wfile.flush();
          
-        elif("bitmap" in self.path and "PNGS"  in self.path):   
+        elif(data_type=="BITMAP-JSON"):   
              
-            start = self.path.index("_");
-            end = self.path.rfind("_");
-            date = int(self.path[start+1:end]);
-            output = data_creator.get_available_data(date, 0,PNG=True);
+            output = data_creator.get_available_data(int(date),int(node),bitmap_json=True);
+            #sending all the required headers
+            self.send_response(200,"ok");
+            self.send_header('mimetype','image/png');
+            self.send_header("Access-Control-Allow-Origin","null");
+            self.send_header("Content-Length",len(output));
+            self.send_header('Connection', 'keep-alive');
+            self.end_headers();
+            
+            #streaming the required data to client
+            self.wfile.write(output);
+            self.wfile.flush();
+        
+        elif(data_type=="BITMAP-PNG"):   
+             
+            output = data_creator.get_available_data(int(date),int(node),bitmap_PNG=True);
             #sending all the required headers
             self.send_response(200,"ok");
             self.send_header('mimetype','image/png');
@@ -90,39 +104,43 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(img);
                 self.wfile.flush();
               
-        elif(data_type=="AGG"):             
-            data= data_creator.get_available_data(int(date),int(node),aggregated=True);
+        elif(data_type=="AGG"):       
+                  
+            output = data_creator.get_available_data(int(date),int(node),aggregated=True);
             #sending all the required headers
             self.send_response(200,"ok");
             self.send_header("Access-Control-Allow-Origin","null");
             self.send_header('mimetype','application/json');
-            self.send_header("Content-Length",len(data));
+            self.send_header("Content-Length",len(output));
             self.send_header('Connection', 'keep-alive');
             self.end_headers();
              
             # sending file to client via output stream
-            self.wfile.write(data) 
+            self.wfile.write(output) 
             self.wfile.flush();
              
-        elif(data_type=="RAW"):              
-            file= data_creator.get_available_data(int(date),int(node),raw=True);
+        elif(data_type=="RAW"):
+                          
+            output= data_creator.get_available_data(int(date),int(node),raw=True);
             #sending all the required headers
             self.send_response(200,"ok");
             self.send_header("Access-Control-Allow-Origin","*");
             self.send_header('mimetype','application/json');
-            self.send_header("Content-Length",len(file));
+            self.send_header("Content-Length",len(output));
             self.send_header('Connection', 'keep-alive');
             self.end_headers();
              
             # sending file to client via output stream
-            self.wfile.write(file) ;
+            self.wfile.write(output) ;
             self.wfile.flush();
         else:
             return;
 
     
-    #method for handling http post request which exposes data check api 
     def do_POST(self):
+        """method for handling http post request which exposes data check api for checking if the data in certain format 
+        and certain date is ready to stream or not """
+        
         content_len = int(self.headers['content-length']);
         posted_message = self.rfile.read(content_len);
         print("the data used to check data availability is "+posted_message);
@@ -148,8 +166,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     response = data_creator.check_available_data(required_data_date,aggregated=True); 
                 except NotPresentError:
                         response = "not_ready"
-            
-            response="ready";     
+               
             #sending all the required headers to the client
             self.send_response(200,"ok");
             self.send_header("Access-Control-Allow-Origin","*");
@@ -190,6 +207,7 @@ if __name__ == '__main__':
     data_creator =  DataCreator();   
     data_creator.create_data_for_date(20140130);
     print(data_creator.check_available_data(20140130,aggregated=True))
+    print(data_creator.check_available_data(20140130,bitmap=True))
     #continuing with the regular server active process for data creation
 
     

@@ -50,16 +50,18 @@ class DataCreator(object):
             self.__aggregated_data_for_date[date].append({"indicator":"not_ready", "data":None});
                         
         list_of_processes=[];
+        
         q= Queue();
         # call the class that should create data in two additional formats
         for i in range(9):
-            agg_obj = DataInDifferentFormat(date,i+1, aggregate=q);
-            agg_obj.start();
-            list_of_processes.append(agg_obj);
+#             agg_obj = DataInDifferentFormat(date,i+1, aggregate=q);
+#             agg_obj.start();
+#             list_of_processes.append(agg_obj);
               
-#             bitmap_obj = DataInDifferentFormat(date,i+1, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
-#             bitmap_obj.start();
-#             list_of_processes.append(bitmap_obj);
+            bitmap_obj = DataInDifferentFormat(date,i+1, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
+            bitmap_obj.start();
+            list_of_processes.append(bitmap_obj);
+            
         list_of_threads=[];      
         import datetime;
         start = datetime.datetime.now();
@@ -115,7 +117,7 @@ class DataCreator(object):
             
             return "ready";
         
-    def get_available_data(self, date, node, raw=False, bitmap=False, aggregated=False,PNG=False):
+    def get_available_data(self, date, node, raw=False, bitmap_json=False, aggregated=False,bitmap_PNG=False):
         """ Function which returns data to the caller based on the parameters passed and data availability"""
         self.check_if_data_for_date_is_ready(date);
         
@@ -126,13 +128,14 @@ class DataCreator(object):
             else:
                 return data["data"];
             
-        elif(bitmap == True):
+        elif(bitmap_json == True):
             data = self.__canvas_data_for_date[date][node-1];
             if data["indicator"] == "not_ready":
                 raise NotPresentError("data in this format is not ready");
             else:
                 return data["data"];
-        elif(PNG == True):
+            
+        elif(bitmap_PNG == True):
             data = self.__canvas_data_for_date[date][node-1];
             if data["indicator"] == "not_ready":
                 raise NotPresentError("data in this format is not ready");
@@ -201,7 +204,7 @@ class ReadIntoMemory(Thread):
             content_length =0; #calculate the content length in bytes of all images to stream in total
             PNGS=[]; #list to hold all the pngs data in memory
             #reading all the images to memory to stream
-            for x in xrange(1,61):
+            for x in xrange(1,31):
                 buf_string = cStringIO.StringIO();
                 Image.open(self.path+"\\imgs\\"+str(x)+".png").save(buf_string, format="PNG", quality=100);
                 content_length = content_length+(buf_string.tell()+2); 

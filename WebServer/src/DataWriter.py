@@ -12,22 +12,13 @@ from PIL import Image, ImageDraw;
 import cPickle,os;
 
 class DataInDifferentFormat(Process):
-    """ This threaded class object is responsible for creating new data in different format as per the requirement"""
+    """ This sub process class object is responsible for creating new data in different format as per the requirement"""
 
     def __init__(self, date,node, **kwargs):
         Process.__init__(self);
         self.date = date;
         self.node = node;
         self.args = kwargs;
-#         self.node_bounds = [(54.548,-180,79,-60.021),
-#                             (54.548,-60,79,59.989),
-#                             (54.548,60,79,180),
-#                             (-2.155,-180,54.52,-60.021),
-#                             (-2.155,-60,54.52,59.989),
-#                             (-2.155,60,54.52,180),
-#                             (-56.97,-180,-2.187,-60.021),
-#                             (-56.97,60,-2.187,59.989),
-#                             (-56.97,60,-2.187,180)];
         
     def run(self):
         if("bitmap" in self.args):
@@ -113,9 +104,9 @@ class DataInDifferentFormat(Process):
         # list to store all the lines data to draw in bitmap later on
         bitmap_data = [];
         checker = set();
-        x_end_points_in_view = (-3898.2296905911007, 4898.229690591101);
+        x_end_points_in_view = (0,11520);
         # the file to process
-        file_path = "C:\\Users\\walluser\\Desktop\\testing\\data" + str(self.date) + ".csv";
+        file_path = "C:\\D3\\temp\\"+str(self.date)+"\\node"+str(self.node)+"\\output.csv";
         # reading as dictionary all the csv rows so that the ones with same streamline ID can be grouped into one list
         reader = csv.DictReader(open(file_path, 'rb', 2048));
         # for holding nested data for streamline based on flow ID between two stations
@@ -127,7 +118,7 @@ class DataInDifferentFormat(Process):
         upper_bound = len(nested_data[max(nested_data, key=lambda x: len(nested_data[x]))]);
         # iterating through every flow between two stations
         for key, value in nested_data.iteritems():
-            arrow_size = interp(len(value), [1, upper_bound], [10, 1]);  # getting size of arrow based on the number of points in a flow
+            arrow_size = interp(len(value), [1, upper_bound], [10, 5]);  # getting size of arrow based on the number of points in a flow
 #             print(key,arrow_size);
             station_data = value[0];
             # adding the stations data to show stations in the map
@@ -203,23 +194,30 @@ class DataInDifferentFormat(Process):
         
     def __draw_images(self, bitmap_data, path_stream_data):
         """This function creates PNG images for each frame of streamline flow animation and stores them in stream data to stream later on"""
-        dir_path = "C:\\Users\\walluser\\Desktop\\testing\\"+str(self.date);
+        dir_path = "C:\\D3\\temp\\bitmap\\"+str(self.date)+"\\"+str(self.node);
         #checking if the directory exists or not
         if not(os.path.exists(dir_path)):
             os.makedirs(dir_path+"\\imgs");
+        
+        #object to transform pixel coordinates on svg to equivalent canvas coordinates overlayed on top of it based on the node
+        transformer = NodeCoordinateTransformer(self.node);
             
-        for frame in range(1, 61):
-            t = float(frame * 16) / float(1000);
-            img = Image.new("RGBA", (1280, 800), color=(0, 0, 0, 0));
+        for frame in range(1, 31):
+            t = float(frame * 33.33) / float(1000);
+            img = Image.new("RGBA", (3840, 2160), color=(0, 0, 0, 0));
             draw = ImageDraw.Draw(img);
             # drawing all the lines first in one loop
             for line in bitmap_data:
                 a = line['start'];
                 c = line['interpolate'](t);
                 x1, y1 = math.ceil(c[0]), math.ceil(c[1]);
-                draw.line([a[0], a[1], x1, y1], fill="#FD5959", width=1);
-                  
-                line['end'] = (x1, y1);
+                #converting the coordinates for a node overlayed canvas
+                start = transformer.convert_to_actual_XY(a[0], a[1]);
+                end = transformer.convert_to_actual_XY(x1, y1);
+                
+                draw.line([start[0], start[1],end[0], end[1]], fill="#FD5959", width=1);
+                line['end'] = (x1,y1);
+                
             # drawing all arrow heads in one loop
             for line in bitmap_data:
                 x1, y1 = line['end'][0], line['end'][1];
@@ -227,7 +225,13 @@ class DataInDifferentFormat(Process):
                 left_y = math.ceil(y1 + math.sin(line['before']) * line['h']);
                 right_x = math.ceil(x1 + math.cos(line['after']) * line['h']);
                 right_y = math.ceil(y1 + math.sin(line['after']) * line['h']);
-                draw.polygon([x1, y1, left_x, left_y, right_x, right_y, x1, y1], fill="white", outline="white")
+                
+                end = transformer.convert_to_actual_XY(x1, y1);
+                left= transformer.convert_to_actual_XY(left_x, left_y);
+                right= transformer.convert_to_actual_XY(right_x, right_y);
+                
+                draw.polygon([end[0], end[1], left[0], left[1], right[0], right[1], end[0],end[1]], fill="white", outline="white");
+                
             img.save(dir_path+"\\imgs\\" + str(frame) + ".png", "PNG", quality=100);
 
         file_path = dir_path+"\\data.json";
@@ -236,7 +240,7 @@ class DataInDifferentFormat(Process):
             cPickle.dump(path_stream_data, f, protocol=cPickle.HIGHEST_PROTOCOL);
 
         self.args["bitmap"].put({"d":self.date,'n':self.node,"bmp":True,'p':dir_path});
-        print("bitmap finished"); 
+        print("bitmap finished for "+str(self.node)); 
             
 
     def __project_points_to_mercator(self, lon, lat):
@@ -388,6 +392,28 @@ class DataInDifferentFormat(Process):
         temp.append([x1, y1]);
         temp.append([x2, y2]);
         return temp;
+    
+    
+class NodeCoordinateTransformer(object):
+    """ This class object will be resposible for normalizing data in map coordinates to canvas coordinate for individual nodes """
+    #tuple that holds starting x and y coordinates for each node in wall
+    node_starting_dimensions = ((0,0),(3840,0),(7680,0),(0,2160),(3840,2160),(7680,2160),(0,4320),(3840,4320),(7680,4320));
+    
+    def __init__(self,node_id):
+        """ This function intializes the starting coordinates for this node based on the node id"""
+        self.start_x = NodeCoordinateTransformer.node_starting_dimensions[node_id-1][0];
+        self.start_y = NodeCoordinateTransformer.node_starting_dimensions[node_id-1][1];
+        
+    
+    def convert_to_actual_XY(self,x,y):
+        """ This function takes a coordinate value for a node and converts that into coordinate value for canvas overlayed on svg on that  node"""
+        temp=[];
+        
+        temp.append(x-self.start_x);
+        temp.append(y-self.start_y);
+        
+        return temp;
+        
     
 class InvalidFormatError(Exception):
     """Class that raises exception when passed data is not a integer"""
