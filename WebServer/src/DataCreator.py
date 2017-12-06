@@ -34,7 +34,7 @@ class DataCreator(object):
 #             raw_thread= ReadIntoMemory(self.__raw_data_for_date[date][index],"C:\\D3\\temp\\"+str(date)+"\\node"+str(index+1)+"\\output.csv",raw=True);
 #             raw_thread.start();
 #             list_of_threads.append(raw_thread); 
-#         
+# #         
 #         for t in list_of_threads:
 #             t.join();
         # adding a key for the date which bitmap data is to be created  
@@ -57,7 +57,7 @@ class DataCreator(object):
 #             agg_obj = DataInDifferentFormat(date,i+1, aggregate=q);
 #             agg_obj.start();
 #             list_of_processes.append(agg_obj);
-              
+               
             bitmap_obj = DataInDifferentFormat(date,i+1, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
             bitmap_obj.start();
             list_of_processes.append(bitmap_obj);
@@ -76,7 +76,7 @@ class DataCreator(object):
                     list_of_threads.append(agg_thread);
                 elif('bmp' in response):
                     bitmap_thread = ReadIntoMemory(self.__canvas_data_for_date[res_date][res_node-1],res_path,bitmap=True);
-                    bitmap_thread.run();
+                    bitmap_thread.start()
                     list_of_threads.append(bitmap_thread);
                 counter+=1;
             except Exception as e:
@@ -201,14 +201,21 @@ class ReadIntoMemory(Thread):
             with open(self.path+"\\data.json","rb")as f:
                 self.data_holder['data'] = json.dumps(cPickle.load(f));
 
+            #not loading images into memory if there is none images
+            if(self.data_holder['data']=='""'):
+                #indicating that reading in memory is finished for this data  
+                self.data_holder['frames']=(0,[]);
+                self.data_holder["indicator"]='ready'; 
+                return;
+            
             content_length =0; #calculate the content length in bytes of all images to stream in total
             PNGS=[]; #list to hold all the pngs data in memory
             #reading all the images to memory to stream
             for x in xrange(1,31):
                 buf_string = cStringIO.StringIO();
                 Image.open(self.path+"\\imgs\\"+str(x)+".png").save(buf_string, format="PNG", quality=100);
-                content_length = content_length+(buf_string.tell()+2); 
-                PNGS.append(struct.pack('!H',buf_string.tell())+buf_string.getvalue());
+                content_length = content_length+(buf_string.tell()+4); 
+                PNGS.append(struct.pack('>I',buf_string.tell())+buf_string.getvalue());
                 buf_string.close();
                 
             self.data_holder['frames']=(content_length,PNGS);

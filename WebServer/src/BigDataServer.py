@@ -84,7 +84,6 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length",len(output));
             self.send_header('Connection', 'keep-alive');
             self.end_headers();
-            
             #streaming the required data to client
             self.wfile.write(output);
             self.wfile.flush();
@@ -205,9 +204,9 @@ if __name__ == '__main__':
     DataCreator.read_transformed_coordinates_to_array();
     #instance that creates data in different format for each date
     data_creator =  DataCreator();   
-    data_creator.create_data_for_date(20140130);
-    print(data_creator.check_available_data(20140130,aggregated=True))
-    print(data_creator.check_available_data(20140130,bitmap=True))
+    data_creator.create_data_for_date(19291128);
+    print(data_creator.check_available_data(19291128,aggregated=True))
+    print(data_creator.check_available_data(19291128,bitmap=True))
     #continuing with the regular server active process for data creation
 
     

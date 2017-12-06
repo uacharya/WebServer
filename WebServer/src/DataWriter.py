@@ -108,7 +108,11 @@ class DataInDifferentFormat(Process):
         # the file to process
         file_path = "C:\\D3\\temp\\"+str(self.date)+"\\node"+str(self.node)+"\\output.csv";
         # reading as dictionary all the csv rows so that the ones with same streamline ID can be grouped into one list
-        reader = csv.DictReader(open(file_path, 'rb', 2048));
+        reader = list(csv.DictReader(open(file_path, 'rb', 2048)));
+        #checking if the file is empty
+        if(len(reader)==0):
+            self.__draw_images(bitmap_data, path_stream_data);
+            return;
         # for holding nested data for streamline based on flow ID between two stations
         nested_data = defaultdict(list); 
         # iterating over csv lines and grouping them according to same streamline ID
@@ -152,7 +156,7 @@ class DataInDifferentFormat(Process):
                         move_angle = 30 * (math.pi / 180);
                         before_angle = (math.pi + angle) - move_angle;
                         after_angle = (math.pi + angle) + move_angle;
-                        hypo = abs(10 / math.cos(move_angle));
+                        hypo = abs(arrow_size/ math.cos(move_angle));
                         # creating an object and appending its info to stream to client
                         obj = (start_point[0], start_point[1], end_point[0], end_point[1], velocity);
                         flow_data.append(obj);
@@ -198,10 +202,23 @@ class DataInDifferentFormat(Process):
         #checking if the directory exists or not
         if not(os.path.exists(dir_path)):
             os.makedirs(dir_path+"\\imgs");
+        #path for writing lines data in ascii format for streaming to client
+        file_path = dir_path+"\\data.json";
         
+        #writing empty image data and file if the raw data is empty
+        if(not path_stream_data['path']):
+            path_stream_data="";
+            # writing empty string to a json file when there is no data
+            with open(file_path, "wb") as f:
+                cPickle.dump(path_stream_data, f, protocol=cPickle.HIGHEST_PROTOCOL);
+    
+            self.args["bitmap"].put({"d":self.date,'n':self.node,"bmp":True,'p':dir_path});
+            print("bitmap finished for "+str(self.node)); 
+            return;
+            
         #object to transform pixel coordinates on svg to equivalent canvas coordinates overlayed on top of it based on the node
         transformer = NodeCoordinateTransformer(self.node);
-            
+        print("working for "+str(self.node));
         for frame in range(1, 31):
             t = float(frame * 33.33) / float(1000);
             img = Image.new("RGBA", (3840, 2160), color=(0, 0, 0, 0));
@@ -234,7 +251,6 @@ class DataInDifferentFormat(Process):
                 
             img.save(dir_path+"\\imgs\\" + str(frame) + ".png", "PNG", quality=100);
 
-        file_path = dir_path+"\\data.json";
         # writing the data to a json file for each date
         with open(file_path, "wb") as f:
             cPickle.dump(path_stream_data, f, protocol=cPickle.HIGHEST_PROTOCOL);
