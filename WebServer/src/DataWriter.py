@@ -106,24 +106,22 @@ class DataInDifferentFormat(Process):
         checker = set();
         x_end_points_in_view = (0,11520);
         # the file to process
-        file_path = "C:\\D3\\temp\\"+str(self.date)+"\\node"+str(self.node)+"\\output.csv";
-        # reading as dictionary all the csv rows so that the ones with same streamline ID can be grouped into one list
-        reader = list(csv.DictReader(open(file_path, 'rb', 2048)));
+        file_path = "C:\\D3\\temp\\agg\\data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
+        #the aggregated data read from memory
+        with open(file_path,'rb') as f:
+            reader = cPickle.load(f);
         #checking if the file is empty
         if(len(reader)==0):
             self.__draw_images(bitmap_data, path_stream_data);
             return;
-        # for holding nested data for streamline based on flow ID between two stations
-        nested_data = defaultdict(list); 
-        # iterating over csv lines and grouping them according to same streamline ID
-        for line in reader:
-            nested_data[line["ID"]].append(line); 
         # normalizing arrow size based on the number of lines in a particular flow
-        upper_bound = len(nested_data[max(nested_data, key=lambda x: len(nested_data[x]))]);
+        upper_bound = reader['upper_bound'];
+        del reader['upper_bound'];
         # iterating through every flow between two stations
-        for key, value in nested_data.iteritems():
+        for key in reader:
+            #list of data for a particular flow for a key
+            value=reader[key];
             arrow_size = interp(len(value), [1, upper_bound], [10, 5]);  # getting size of arrow based on the number of points in a flow
-#             print(key,arrow_size);
             station_data = value[0];
             # adding the stations data to show stations in the map
             source_station = (station_data['Source'], station_data['S_Lat'], station_data['S_Lon']);
@@ -214,11 +212,9 @@ class DataInDifferentFormat(Process):
     
             self.args["bitmap"].put({"d":self.date,'n':self.node,"bmp":True,'p':dir_path});
             print("bitmap finished for "+str(self.node)); 
-            return;
-            
+            return; 
         #object to transform pixel coordinates on svg to equivalent canvas coordinates overlayed on top of it based on the node
         transformer = NodeCoordinateTransformer(self.node);
-        print("working for "+str(self.node));
         for frame in range(1, 31):
             t = float(frame * 33.33) / float(1000);
             img = Image.new("RGBA", (3840, 2160), color=(0, 0, 0, 0));
