@@ -6,6 +6,7 @@ Created on Aug 25, 2017
 from multiprocessing import Process;
 import math, csv;
 from collections import defaultdict;
+from cStringIO import StringIO;
 from numpy import interp;
 import numpy as np;
 from PIL import Image, ImageDraw;
@@ -25,10 +26,12 @@ class DataInDifferentFormat(Process):
             self.__create_PNG_images(self.args['interpolation_width'] if ('interpolation_width' in self.args) else 0);
 
         elif("aggregate" in self.args):
+            from pywebhdfs.webhdfs import PyWebHdfsClient;
+            hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya'); 
             # the file to process
-            file_path = "C:\\D3\\temp\\"+str(self.date)+"\\node"+str(self.node)+"\\output.csv";
+            file_path ='user/uacharya/'+str(self.date)+'/node'+str(self.node)+'/output.csv'
             # reading as dictionary all the csv rows so that the ones with same streamline ID can be grouped into one list
-            reader = list(csv.DictReader(open(file_path, 'rb', 2048)));
+            reader = list(csv.DictReader(StringIO(hdfs.read_file(file_path,buffersize=4096))));
             #checking if the file is empty
             if(len(reader)==0):
                 self.__write_data_to_file("");
@@ -45,6 +48,9 @@ class DataInDifferentFormat(Process):
             for key, data in nested_data_based_on_id.iteritems():
                 total_data_points_for_a_flow = len(data);
                 dist_between_in_degrees = self.__get_diff_in_coord(data[0],data[total_data_points_for_a_flow-1]);
+                
+                if(dist_between_in_degrees==0):
+                    dist_between_in_degrees=1;
 
                 # aggregate the data based on whether data points are more than the distance between source and destination so that data points per km can be shown
                 if(dist_between_in_degrees < total_data_points_for_a_flow):
@@ -89,7 +95,7 @@ class DataInDifferentFormat(Process):
             
     def __write_data_to_file(self, obj):
         """This function writes the aggregated data in the form of dictionary to a json file for later use"""
-        file_path = "C:\\D3\\temp\\agg\\data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
+        file_path = "./temp_data/agg/data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
         # writing the data to a json file for each date
         with open(file_path, "wb") as f:
             cPickle.dump(obj, f,protocol=cPickle.HIGHEST_PROTOCOL);
@@ -100,13 +106,14 @@ class DataInDifferentFormat(Process):
     def __create_PNG_images(self, interpolation_width): 
         """This function reads the streamline data and created images for all 60 frames based on the data"""
         # dictionary to hold the images data and every path data to stream to client
+        print("the data is for node {}".format(self.node));
         path_stream_data = {'stations':[], 'path':[]};
         # list to store all the lines data to draw in bitmap later on
         bitmap_data = [];
         checker = set();
         x_end_points_in_view = (0,11520);
         # the file to process
-        file_path = "C:\\D3\\temp\\agg\\data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
+        file_path = "./temp_data/agg/data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
         #the aggregated data read from memory
         with open(file_path,'rb') as f:
             reader = cPickle.load(f);
@@ -126,6 +133,8 @@ class DataInDifferentFormat(Process):
             # adding the stations data to show stations in the map
             source_station = (station_data['Source'], station_data['S_Lat'], station_data['S_Lon']);
             destination_station = (station_data['Destination'], station_data['D_Lat'], station_data['D_Lon']);
+            #changing key so that ID name in view doesnot start with a number and interaction can be done based on station name
+            key = station_data["Source"]+"_to_"+station_data["Destination"];
             # adding only unique elements to stations data
             if source_station[0] not in checker:
                 path_stream_data['stations'].append(source_station);
@@ -196,12 +205,12 @@ class DataInDifferentFormat(Process):
         
     def __draw_images(self, bitmap_data, path_stream_data):
         """This function creates PNG images for each frame of streamline flow animation and stores them in stream data to stream later on"""
-        dir_path = "C:\\D3\\temp\\bitmap\\"+str(self.date)+"\\"+str(self.node);
+        dir_path = "./temp_data/bitmap/" + str(self.date) +"/"+str(self.node);
         #checking if the directory exists or not
         if not(os.path.exists(dir_path)):
-            os.makedirs(dir_path+"\\imgs");
+            os.makedirs(dir_path+"/imgs");
         #path for writing lines data in ascii format for streaming to client
-        file_path = dir_path+"\\data.json";
+        file_path = dir_path+"/data.json";
         
         #writing empty image data and file if the raw data is empty
         if(not path_stream_data['path']):
@@ -242,10 +251,10 @@ class DataInDifferentFormat(Process):
                 end = transformer.convert_to_actual_XY(x1, y1);
                 left= transformer.convert_to_actual_XY(left_x, left_y);
                 right= transformer.convert_to_actual_XY(right_x, right_y);
-                
+              
                 draw.polygon([end[0], end[1], left[0], left[1], right[0], right[1], end[0],end[1]], fill="white", outline="white");
                 
-            img.save(dir_path+"\\imgs\\" + str(frame) + ".png", "PNG", quality=100);
+            img.save(dir_path+"/imgs/" + str(frame) + ".png", "PNG", quality=100);
 
         # writing the data to a json file for each date
         with open(file_path, "wb") as f:
@@ -346,7 +355,11 @@ class DataInDifferentFormat(Process):
         """This function interpolates parallel lines on both side of the given line within the interpolation width"""
         run = value[1][0] - value[0][0];
         rise = value[0][1] - value[1][1];
-        tan_ratio = rise / run;
+        try:
+            tan_ratio = rise / run;
+        except ZeroDivisionError:
+            tan_ratio = float('inf');
+            
         y_max = value[0][1] + interpolation_width;
         y_min = value[0][1] - interpolation_width;
         x_max = value[0][0] + interpolation_width;

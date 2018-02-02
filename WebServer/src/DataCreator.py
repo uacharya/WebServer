@@ -162,7 +162,7 @@ class DataCreator(object):
         # only when list is empty
         if(cls.mercator_projected_coordinates == None):
             cls.mercator_projected_coordinates = [];
-            with open("C:\\Users\\walluser\\javaWorkspace\\D3EventServer\\D3\\WebContent\\wall_coord_data.txt", "r") as read_file:
+            with open("./wall_coord_data.txt", "r") as read_file:
                 for line in read_file:
                     contents = line.split();
                     cls.mercator_projected_coordinates.append(contents);
@@ -200,7 +200,7 @@ class ReadIntoMemory(Thread):
             
         elif("bitmap" in self.arg):
             #putting the line data into a object to stream
-            with open(self.path+"\\data.json","rb")as f:
+            with open(self.path+"/data.json","rb")as f:
                 self.data_holder['data'] = json.dumps(cPickle.load(f));          
 #             with open(self.path+"\\data.json","rb")as f:
 #                 output = cPickle.load(f);  
@@ -221,7 +221,7 @@ class ReadIntoMemory(Thread):
             #reading all the images to memory to stream
             for x in xrange(1,31):
                 buf_string = cStringIO.StringIO();
-                Image.open(self.path+"\\imgs\\"+str(x)+".png").save(buf_string, format="PNG", quality=100);
+                Image.open(self.path+"/imgs/"+str(x)+".png").save(buf_string, format="PNG", quality=100);
                 content_length = content_length+(buf_string.tell()+4); 
                 PNGS.append(struct.pack('>I',buf_string.tell())+buf_string.getvalue());
                 buf_string.close();

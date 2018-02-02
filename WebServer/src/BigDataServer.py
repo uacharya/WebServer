@@ -24,7 +24,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             if(queries['op'][0]=='OPEN'):
                 
                 if ("world-map" in path):
-                    file_path = "C:\\Users\\walluser\\javaWorkspace\\D3EventServer\\D3\\WebContent\\world-map.json";             
+                    file_path = "./world-map.json";             
                     #sending all the required headers
                     self.send_response(200,"ok");
                     self.send_header("Access-Control-Allow-Origin","*");
@@ -55,10 +55,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
         data_type = query_dict['type'][0];
                               
         if(data_type=="BITMAP"):    
-            start = self.path.index("_");
-            end = self.path.rfind("_");
-            date = int(self.path[start+1:end]);
-            output = data_creator.get_available_data(date, 0,bitmap=True);  
+            output = data_creator.get_available_data(int(date),int(node),bitmap_json=True); 
             #sending all the required headers             
             self.send_response(200,"ok");
             self.send_header('mimetype','multipart/json');
@@ -187,7 +184,7 @@ class ThreadedServer(SocketServer.ThreadingMixIn,HTTPServer):
 def runServer():
     """ The http server which fetches data from hdfs and streams to client upon request """
     try:
-        server_address = ("10.29.3.2", 8085);
+        server_address = ("10.29.2.27", 8085);
         httpServer = ThreadedServer(server_address, CustomHTTPRequestHandler);
         print("web server is running");
         httpServer.serve_forever();     
