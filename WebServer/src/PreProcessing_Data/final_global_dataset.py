@@ -7,7 +7,7 @@ from Create_required_text_file import Data;
 
 if __name__ == '__main__':
     
-    file_path_of_total_data = "C:\\Users\\walluser\\Total_Global_Weather_Data.txt";
+    file_path_of_total_data = "C:\\Users\\walluser\\bash_scripts\\1972_combined.txt";
     
     file_path_of_country_and_station_name_with_atrributes = "C:\\Users\\walluser\\Global_Weather_Dataset\\station_names_into_countries.txt";
     
