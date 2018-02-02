@@ -1,3 +1,4 @@
+#!/usr/bin/python2.7
 from pyspark import SparkConf,SparkContext;
 import math,time;
 from pyspark.serializers import MarshalSerializer;
@@ -15,25 +16,24 @@ def create_required_datewise_data(line):
                        "Station_Latitude":str(data[16]), "Station_Longitude":str(data[17]), "Station_Elevation":str(data[18])};
     
     
-    return (key, data_features);
-
+    return (key,data_features);
 
 def create_data_from_station_data(first, second):
     """this function creates the data analyzing the two stations in comparison"""
     global hdfs; #global hdfs object
     global hbase; #global hbase object
     
-    if(hdfs==None): 
+    if(hdfs is None): 
         from pywebhdfs.webhdfs import PyWebHdfsClient; 
         hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya'); 
-    
-    if(hbase==None):
-        import happybase; 
+   
+    if(hbase is None):
+        import happybase;
         hbase = happybase.ConnectionPool(size=1,host='cshadoop.boisestate.edu');
-    
+ 
     date_for_comparision = first["Date"].strip();
-    
-    # creating directory for each date
+
+   # creating directory for each date
     try:
         hdfs.get_file_dir_status('user/uacharya/simulation/'+date_for_comparision);
     except Exception:
@@ -44,38 +44,30 @@ def create_data_from_station_data(first, second):
                 hdfs.create_file('user/uacharya/simulation/'+date_for_comparision+'/node'+str(index)+'/output.csv',content,replication=1);
             except Exception:
                 continue;
-#     hdfs.make_dir('user/uacharya/simulation/dataChecker');  
-#            
-#     try:
-#         hdfs.get_file_dir_status('user/uacharya/simulation/dataChecker/'+date_for_comparision);
-#     except Exception:
-#         try:
-#             hdfs.create_file('user/uacharya/simulation/dataChecker/'+date_for_comparision+'/check.txt','',replication=1);
-#         except Exception:
-#             pass;
-    
+   
     
     dataset = {'node1':[],'node2':[],'node3':[],'node4':[],'node5':[],'node6':[],'node7':[],'node8':[],'node9':[]};
-    
+   
     for data in broadcast_variable.value:
         compare_data_between(date_for_comparision, first, data,dataset);
 
-#     for key in dataset:
-#         if(len(dataset[key])!=0):
-#             content = "\n".join(dataset[key]);
-#             while(True):
-#                 try:
-#                     hdfs.append_file('user/uacharya/simulation/'+date_for_comparision+'/'+key+'/output.csv',content,buffersize=4096);
-#                     break;
-#                 except Exception:
-#                     time.sleep(0.5);
-#                     continue;
+#    for key in dataset:
+#        if(len(dataset[key])!=0):
+#            content = "\n".join(dataset[key]);
+#            content +="\n";
+#            while(True):
+#                try:
+#                    hdfs.append_file('user/uacharya/simulation/'+date+'/'+key+'/output.csv',content,buffersize=4096);
+#                    break;
+#                except Exception:
+#                    time.sleep(0.2);
+#                    continue;
+
     
     dataset.clear(); #clearing the dictionary
     # append over here after all the global variable has been made        
     return second;
-
-
+ 
 def compare_data_between(date, first_station, second_station,dataset):
     """this function does the detailed comparing of a pair of stations using equations of physics to create wind flow simulation"""
     global hbase;
@@ -106,35 +98,8 @@ def compare_data_between(date, first_station, second_station,dataset):
                     return;
                 else:
                     table.put(ID.encode(),{('f:'+date).encode():'y'.encode()});
-#                 filt = "SingleColumnValueFilter('flow','"+date+"',=,'binaryprefix:"+ID+"',true,true)";
-#                 res_generator = table.scan(filter=filt,limit=1);
-#                 for d in res_generator:
-#                     data = d;              
-#                 if(data):
-#                     return;
-#                 else:
-#                     from datetime import datetime;
-#                     row = datetime.now().strftime("%H%M%S%f");
-#                     table.put(row.encode(),{('flow:'+date).encode():ID.encode()}); 
-#                 try:
-#                     data = hdfs.read_file('user/uacharya/simulation/dataChecker/'+date+'/check.txt');
-#                 except Exception:
-#                     try:
-#                         hdfs.create_file('user/uacharya/simulation/dataChecker/'+date+'/check.txt','',replication=1);
-#                     except Exception:
-#                         pass;                      
-#                 if ID in data:
-#                     return;
-#                 else:
-#                     content = ID+',';
-#                     while(True):
-#                         try:
-#                             hdfs.append_file('user/uacharya/simulation/dataChecker/'+date+'/check.txt',content,buffersize=1024);
-#                             break;
-#                         except Exception:
-#                             continue;
                 
-                # getting the final destination wind velocity using bernoulli principle
+        # getting the final destination wind velocity using bernoulli principle
                 temp_value = 2 * (((first_station_pressure / first_station_air_density) - (second_station_pressure / second_station_air_density)) + 
                                             (717 * (float(first_station["Temperature"]) - float(second_station["Temperature"]))) + 
                                             (9.8 * (float(first_station["Station_Elevation"]) - float(second_station["Station_Elevation"]))) + 
@@ -158,40 +123,12 @@ def compare_data_between(date, first_station, second_station,dataset):
                 #checking if the data for particular pair has already been written
                 data=None;
                 data = table.row(ID.encode(),columns=[('f:'+date).encode()]);
- 
+
                 if(data):
                     return;
                 else:
                     table.put(ID.encode(),{('f:'+date).encode():'y'.encode()});
 
-#                 filt = "SingleColumnValueFilter('flow','"+date+"',=,'binaryprefix:"+ID+"',true,true)";
-#                 res_generator = table.scan(filter=filt,limit=1);
-#                 for d in res_generator:
-#                     data = d;              
-#                 if(data):
-#                     return;
-#                 else:
-#                     from datetime import datetime;
-#                     row = datetime.now().strftime("%H%M%S%f");
-#                     table.put(row.encode(),{('flow:'+date).encode():ID.encode()}); 
-#                 try:
-#                     data = hdfs.read_file('user/uacharya/simulation/dataChecker/'+date+'/check.txt');
-#                 except Exception:
-#                     try:
-#                         hdfs.create_file('user/uacharya/simulation/dataChecker/'+date+'/check.txt','',replication=1);
-#                     except Exception:
-#                         pass;                      
-#                 if ID in data:
-#                     return;
-#                 else:
-#                     content = ID+',';
-#                     while(True):
-#                         try:
-#                             hdfs.append_file('user/uacharya/simulation/dataChecker/'+date+'/check.txt',content,buffersize=1024);
-#                             break;
-#                         except Exception:
-#                             continue;
-    
                 # getting the final destination wind velocity using bernoulli principle
                 temp_value = 2 * (((second_station_pressure / second_station_air_density) - (first_station_pressure / first_station_air_density)) + 
                                             (717 * (float(second_station["Temperature"]) - float(first_station["Temperature"]))) + 
@@ -238,20 +175,23 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     # distance between the two points in meters
     return (c, R * c);
-    
-
+   
 def create_simulation_data(date,ID,source_name,destination_name, source_station, destination_station, acceleration, time_to_reach,final_velocity,dataset):
     """This function writes the data into each node data holder by performing a bit of calculation first"""
     start_velocity = initial_wind_velocity = float(source_station["Station_Wind_Velocity"]);
-    total_time = int(math.ceil(acceleration[1] * 3959 )); #distance in miles between points
-    time_in_seconds_per_step = time_to_reach/float(total_time);
+#     total_distance = math.ceil(acceleration[1] * 3959 ); #distance in miles between points
+    #larger distance between two points either lon diff or lat diff
+    diff = find_larger_diff_between(float(source_station["Station_Latitude"]),float(source_station["Station_Longitude"]),float(destination_station["Station_Latitude"]),float(destination_station["Station_Longitude"]));
+    #finding interpolation points between two stations to a reasonable steps
+    total_steps = int(math.ceil(diff));
+    time_in_seconds_per_step = float(time_to_reach)/float(total_steps);
     counter = 1;
     # getting all the locations that are in between source and destination wind flow
-    intermediate_locations = get_intermediate_wind_locations(source_station, destination_station, acceleration[1], total_time);
+    intermediate_locations = get_intermediate_wind_locations(source_station, destination_station, acceleration[1], total_steps);
     # writing first data so that first line starts from center of the source station
     write_to_csv_data(date,ID,source_name,destination_name,source_station["Station_Latitude"], source_station["Station_Longitude"], destination_station["Station_Latitude"],destination_station["Station_Longitude"],intermediate_locations[0],start_velocity,dataset);
     
-    while counter <= total_time:
+    while counter <= total_steps:
         # finding the wind location after coriolis deflection for each point in the route
         actual_wind_location = find_new_wind_location(initial_wind_velocity, counter, intermediate_locations);
         # calculating the new velocity for each intervals in between until the wind reaches the destination
@@ -261,8 +201,60 @@ def create_simulation_data(date,ID,source_name,destination_name, source_station,
         
         initial_wind_velocity = last_wind_velocity;
         counter += 1;
-    
 #     write_to_csv_data(date,ID,source_id,destination_id,source_station["Station_Latitude"],source_station["Station_Longitude"],destination_station["Station_Latitude"],destination_station["Station_Longitude"], intermediate_locations[len(intermediate_locations) - 1], final_velocity);
+    write_to_hdfs_for_one_flow(date,dataset);
+
+ 
+def find_total_wind_flow_points(coordinates_diff):
+    """This functions determines how many points should be plotted between two points based on the geographical locations of source and destination stations"""
+    coordinates_diff = math.ceil(coordinates_diff);
+    
+    if coordinates_diff <=1:
+        total_distance= 5;
+    elif coordinates_diff<5:
+        step = 5-int(coordinates_diff);
+        mul = 2+(0.1*step);
+        total_distance= int(math.ceil(coordinates_diff*mul));
+    elif coordinates_diff<=50:
+        rang =  coordinates_diff/10;
+        step = 2 - (0.1*math.floor(rang));
+        total_distance = int(math.ceil(coordinates_diff*step));
+    else:
+        quotient = math.ceil(coordinates_diff/100);
+        total_distance= int(quotient*100);
+          
+    return total_distance;
+ 
+        
+def find_larger_diff_between(lat1,lon1,lat2,lon2):
+    """This function finds the difference in degrees between two stations and returns the largest difference between longitude difference or latitude difference"""
+    lat_diff = lat1-lat2 if lat1>=lat2 else lat2-lat1;
+    lon_diff = lon1-lon2 if lon1>=lon2 else lon2-lon1;
+    if(lon_diff>=lat_diff):
+        return lon_diff;
+    else:
+        return lat_diff
+
+def write_to_hdfs_for_one_flow(date,dataset):
+    """This function takes the dataset dictionary that holds the data and writes once for each flow so that the dictionary doesnot have to hold a lot of data
+    before finally appending to hdfs which may use a lot of memory"""
+    global hdfs;
+    
+    for key in dataset:
+        if(len(dataset[key])!=0):
+            content = "\n".join(dataset[key]);
+            content +="\n";
+            while(True):
+                try:
+                    hdfs.append_file('user/uacharya/simulation/'+date+'/'+key+'/output.csv',content,buffersize=4096);
+                    break;
+                except Exception:
+                    time.sleep(0.2);
+                    continue;
+            
+    #reinitializing the dataset dictionary so that the objects for one flow are garbage collected
+    for key in dataset:
+        dataset[key]=[];   
            
 
 def find_new_wind_velocity(v0, a, t):
@@ -326,7 +318,6 @@ def write_to_csv_data(date,ID, source_id,destination_id,source_lat,source_lon,de
     """This function writes data for a particular stream flow into every single node data holder list for writing them later to hdfs""" 
     which_node_does_location_belong_to = find_node_location(coordinates);
     content = date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity);  
-
     if (which_node_does_location_belong_to=="Node_1"):
         dataset["node1"].append(content);
     elif(which_node_does_location_belong_to=="Node_2"):
@@ -371,21 +362,20 @@ def find_node_location(coordinates):
         return "Node_8";
     elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= 60 and longitude <= 180)):
         return "Node_9";
-    
-            
+                
 if __name__ == '__main__':
     import happybase;
     # configure the spark environment
     sparkConf = SparkConf().setAppName("Simulating Streamline");
     sparkConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     sc = SparkContext(conf=sparkConf);
-    sc.addPyFile("module.zip");
+    sc.addPyFile("module.zip");      
 #     from pywebhdfs.webhdfs import PyWebHdfsClient;
-    distributed_dataset = sc.textFile("hdfs:/user/uacharya/subset_small_dataset.txt",use_unicode=False,minPartitions=1720);
+    distributed_dataset = sc.textFile("hdfs:/user/uacharya/subset_dataset_1972.txt",use_unicode=False,minPartitions=240);
     print("this is the driver container");
     # getting the header of the whole dataset
     header = distributed_dataset.first();
-    # filtering the header out of the data
+    # filtering the header out of the data 
     distributed_dataset = distributed_dataset.filter(lambda d: d != header);
     # mapping the data to prepare for processing
     data_in_required_format = distributed_dataset.map(create_required_datewise_data);
@@ -395,22 +385,22 @@ if __name__ == '__main__':
     print("total keys "+str(len(temp)));
     #sorting keys to create data in chronological order based on date
     sorted_keys = sorted(temp,key=int);
-    #connecting to database for writing checker data
+   #connecting to database for writing checker data
     database = happybase.ConnectionPool(size=1,host='cshadoop.boisestate.edu');
-    #getting a connection from the pool
-    with database.connection() as db:
-        db.create_table('fChecker'.encode(),{'f'.encode():dict(max_versions=1,in_memory=True)});
+     #getting a connection from the pool
+#    with database.connection() as db:
+#        db.create_table('fChecker'.encode(),{'f'.encode():dict(max_versions=1,in_memory=True)});
     #creating batch processing with new rdd each iteration based on key values
-    for key in sorted_keys:
+    for key in sorted_keys[17:]:   
         print(key);
-        keyed_rdd = data_in_required_format.filter(lambda t: t[0]==key).map(lambda t: t[1]).coalesce(840, shuffle=True);
+        keyed_rdd = data_in_required_format.filter(lambda t: t[0]==key).map(lambda t: t[1]).coalesce(120, shuffle=True);
         keyed_rdd.cache();
         #collecting all the dataset for broadcasting
         broadcast_data = keyed_rdd.collect();
         print(str(len(broadcast_data))+" driver program");
-        #l = keyed_rdd.glom().map(len).collect()  # get length of each partition
-        #print(min(l), max(l), sum(l)/len(l), len(l))  # check if skewed
-        #broadcasting the entire keyed dataset
+#        l = keyed_rdd.glom().map(len).collect()  # get length of each partition
+#        print(min(l), max(l), sum(l)/len(l), len(l))  # check if skewed
+#        broadcasting the entire keyed dataset
         broadcast_variable = sc.broadcast(broadcast_data);
         # analyzing the stations weather variables based on each date to create the simulation data for wind flow
         final_data_after_creating_files = keyed_rdd.treeReduce(create_data_from_station_data,depth=3);
@@ -420,14 +410,10 @@ if __name__ == '__main__':
         broadcast_variable.unpersist(blocking=True);
         #erasing cached keyed rdd
         keyed_rdd.unpersist();
+
         global hbase;
-        global hdfs;
-        #setting both global variables for each task to None so that these connection objects are only created inside executor and not serialized when sending task to them.
-        hbase = hdfs = None;
-        
+    global hdfs;
+    hbase = hdfs = None;#setting both global variables for each task to None so that these connection objects are only created inside executor and not serialized when sending task to them.
+    
     sc.stop();
-
-
-
-
-
+    
