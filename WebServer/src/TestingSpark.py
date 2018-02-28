@@ -46,7 +46,7 @@ def create_data_from_station_data(first, second):
                 continue;
    
     
-    dataset = {'node1':[],'node2':[],'node3':[],'node4':[],'node5':[],'node6':[],'node7':[],'node8':[],'node9':[]};
+    dataset = {'node_1':[],'node_2':[],'node_3':[],'node_4':[],'node_5':[],'node_6':[],'node_7':[],'node_8':[],'node_9':[]};
    
     for data in broadcast_variable.value:
         compare_data_between(date_for_comparision, first, data,dataset);
@@ -193,7 +193,7 @@ def create_simulation_data(date,ID,source_name,destination_name, source_station,
     
     while counter <= total_steps:
         # finding the wind location after coriolis deflection for each point in the route
-        actual_wind_location = find_new_wind_location(initial_wind_velocity, counter, intermediate_locations);
+        actual_wind_location = find_new_wind_location(initial_wind_velocity, counter,time_in_seconds_per_step, intermediate_locations);
         # calculating the new velocity for each intervals in between until the wind reaches the destination
         last_wind_velocity = find_new_wind_velocity(start_velocity, acceleration[0], (counter*time_in_seconds_per_step));
         # writing the data to the file after finding the required attributes for a particular wind flow line
@@ -294,12 +294,11 @@ def get_intermediate_wind_locations(source, destination, distance_in_radians, to
     return intermediate_locations;
         
 
-def find_new_wind_location(velocity, counter, list_of_locations):
+def find_new_wind_location(velocity, counter,TOF, list_of_locations):
     """this function gives actual location coordinate after coriolis deflection takes place"""
     current_location = list_of_locations[counter];
     current_latitute = math.radians(current_location[0]);
     start_latitude = math.radians(list_of_locations[counter-1][0]);
-    TOF = 960;
     # total distance for one degree longitude in that latitude
     distance_for_one_degree_longitude = 111111 * math.cos(current_latitute);
     
@@ -318,50 +317,104 @@ def write_to_csv_data(date,ID, source_id,destination_id,source_lat,source_lon,de
     """This function writes data for a particular stream flow into every single node data holder list for writing them later to hdfs""" 
     which_node_does_location_belong_to = find_node_location(coordinates);
     content = date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity);  
-    if (which_node_does_location_belong_to=="Node_1"):
-        dataset["node1"].append(content);
-    elif(which_node_does_location_belong_to=="Node_2"):
-        dataset["node2"].append(content);
-    elif(which_node_does_location_belong_to=="Node_3"):
-        dataset["node3"].append(content);
-    elif(which_node_does_location_belong_to=="Node_4"):
-        dataset["node4"].append(content);
-    elif(which_node_does_location_belong_to=="Node_5"):
-        dataset["node5"].append(content);
-    elif(which_node_does_location_belong_to=="Node_6"):
-        dataset["node6"].append(content);
-    elif(which_node_does_location_belong_to=="Node_7"):
-        dataset["node7"].append(content);
-    elif(which_node_does_location_belong_to=="Node_8"):
-        dataset["node8"].append(content);
-    elif(which_node_does_location_belong_to=="Node_9"):
-        dataset["node9"].append(content);
-  
+    #adding line to more than one node if the line belongs to multiple over scanned region and only to one if not
+    if(len(which_node_does_location_belong_to)>1):
+        for n in node_list:
+            dataset[n].append(content);
+    elif(len(which_node_does_location_belong_to)==1):
+        dataset[which_node_does_location_belong_to[0]].append(content);  
                      
 
 def find_node_location(coordinates):
     """this function returns a location where the wind line belongs to among all of the monitors based on mercator projection"""
     latitude = coordinates[0];
     longitude = coordinates[1];
+    result = [];
     
+    # this part adds to the node where this line is part of over scanning space
     if((latitude <= 79 and latitude >= 54.548) and(longitude >= -180 and longitude <= -60.021)):
-        return "Node_1";
+        #adding for overscanned parts to nodes on each sides
+        if(longitude<-140 and longitude>=-180):
+            result.append("node_3")
+        if(longitude >-100 and longitude<=-60.021):
+            result.append("node_2");
+            
+        result.append("node_1");
+        
     elif((latitude <= 79 and latitude >= 54.548) and(longitude >=-60 and longitude <= 59.989)):
-        return "Node_2";
+        #adding for overscanned parts to nodes on each sides
+        if(longitude>20 and longitude<=59.989):
+            result.append("node_3")
+        if(longitude >=-60 and longitude<-20):
+            result.append("node_1");
+            
+        result.append("node_2");
+        
     elif((latitude <= 79 and latitude >= 54.548) and(longitude >=60 and longitude <= 180)):
-        return "Node_3";
+        #adding for overscanned parts to nodes on each sides
+        if(longitude<100 and longitude>=60):
+            result.append("node_2")
+        if(longitude >140 and longitude<=180):
+            result.append("node_1");
+            
+        result.append("node_3");
+        
     elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -180 and longitude <= -60.021)):
-        return "Node_4";
+        #adding for overscanned parts to nodes on each sides
+        if(longitude<-140 and longitude>=-180):
+            result.append("node_6")
+        if(longitude >-100 and longitude<=-60.021):
+            result.append("node_5");
+        
+        result.append("node_4");
     elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -60 and longitude <= 59.989)):
-        return "Node_5";
+        #adding for overscanned parts to nodes on each sides
+        if(longitude>20 and longitude<=59.989):
+            result.append("node_6")
+        if(longitude >=-60 and longitude<-20):
+            result.append("node_4");
+            
+        result.append("node_5");
+        
     elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= 60 and longitude <= 180)):
-        return "Node_6";
+        #adding for overscanned parts to nodes on each sides
+        if(longitude<100 and longitude>=60):
+            result.append("node_5")
+        if(longitude >140 and longitude<=180):
+            result.append("node_4");
+        
+        result.append("node_6");
+        
     elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -180 and longitude <= -60.021)):
-        return "Node_7";
+        #adding for overscanned parts to nodes on each sides
+        if(longitude<-140 and longitude>=-180):
+            result.append("node_9")
+        if(longitude >-100 and longitude<=-60.021):
+            result.append("node_8");
+            
+        result.append("node_7");
+        
     elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -60 and longitude <= 59.989)):
-        return "Node_8";
+        #adding for overscanned parts to nodes on each sides
+        if(longitude>20 and longitude<=59.989):
+            result.append("node_9")
+        if(longitude >=-60 and longitude<-20):
+            result.append("node_7");
+            
+        result.append("node_8");
+        
     elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= 60 and longitude <= 180)):
-        return "Node_9";
+        #adding for overscanned parts to nodes on each sides
+        if(longitude<100 and longitude>=60):
+            result.append("node_8")
+        if(longitude >140 and longitude<=180):
+            result.append("node_7");
+            
+        result.append("node_9");
+        
+    return result;
+        
+    
                 
 if __name__ == '__main__':
     import happybase;
