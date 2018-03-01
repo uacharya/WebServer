@@ -319,7 +319,7 @@ def write_to_csv_data(date,ID, source_id,destination_id,source_lat,source_lon,de
     content = date+","+ID+","+source_id+","+destination_id+","+source_lat+","+source_lon+","+destination_lat+","+destination_lon+","+str(coordinates[0])+","+str(coordinates[1])+","+str(velocity);  
     #adding line to more than one node if the line belongs to multiple over scanned region and only to one if not
     if(len(which_node_does_location_belong_to)>1):
-        for n in node_list:
+        for n in which_node_does_location_belong_to:
             dataset[n].append(content);
     elif(len(which_node_does_location_belong_to)==1):
         dataset[which_node_does_location_belong_to[0]].append(content);  

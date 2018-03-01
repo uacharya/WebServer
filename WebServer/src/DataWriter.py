@@ -111,7 +111,7 @@ class DataInDifferentFormat(Process):
         # list to store all the lines data to draw in bitmap later on
         bitmap_data = [];
         checker = set();
-        x_end_points_in_view = (0,11520);
+        x_end_points_in_view = (-1279.891,12799.891);
         # the file to process
         file_path = "./temp_data/agg/data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
         #the aggregated data read from memory
@@ -135,22 +135,37 @@ class DataInDifferentFormat(Process):
             destination_station = (station_data['Destination'], station_data['D_Lat'], station_data['D_Lon']);
             #changing key so that ID name in view doesnot start with a number and interaction can be done based on station name
             key = station_data["Source"]+"_to_"+station_data["Destination"];
-            # adding only unique elements to stations data
-            if source_station[0] not in checker:
-                path_stream_data['stations'].append(source_station);
-                checker.add(source_station[0]);
+            #checking if the source station is supposed to be part of this node
+            if("node_"+str(self.node) in self.__find_node_location(source_station)):
+                # adding only unique elements to stations data
+                if source_station[0] not in checker:
+                    path_stream_data['stations'].append(source_station);
+                    checker.add(source_station[0]);
             
-            if destination_station[0] not in checker:
-                path_stream_data['stations'].append(destination_station);
-                checker.add(destination_station[0]);
+            #checking if the destination station is supposed to be part of this node
+            if("node_"+str(self.node) in self.__find_node_location(destination_station)):
+                if destination_station[0] not in checker:
+                    path_stream_data['stations'].append(destination_station);
+                    checker.add(destination_station[0]);
             
             flow_data = [];  # list for holding data for one flow  
             for i in xrange(len(value)):
                 if(i == len(value) - 1):
                     break;
-                x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));
-                x1 = self.__project_points_to_mercator(float(value[i + 1]['Wind_Lon']), float(value[i + 1]['Wind_Lat']));
-                temp = self.__tween_the_curves(value[i], value[i + 1], x0, x1, x_end_points_in_view[0], x_end_points_in_view[1]);
+                #condition when lines are in left column of tiled display
+                if(self.node in [1,4,7]):
+                    pass
+                #condition when lines are in right column of tiled display
+                elif(self.node in [3,6,9]):
+                    pass
+                #condition when lines belong to middle column of tiled display
+                else:
+                    x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));
+                    x1 = self.__project_points_to_mercator(float(value[i + 1]['Wind_Lon']), float(value[i + 1]['Wind_Lat']));
+                #adding new lines in between was only necessary if we start with different rotation angle or server does panning
+                # which is not the case here so it was removed
+#                 temp = self.__tween_the_curves(value[i], value[i + 1], x0, x1, x_end_points_in_view[0], x_end_points_in_view[1]);
+                temp = [(x0,x1)];
                 # creating additional lines on each side of a line to show more data
                 for line in temp:
                     interpolated_particles = self.__create_random_particles(line, i, interpolation_width);
@@ -178,6 +193,94 @@ class DataInDifferentFormat(Process):
         del checker;  # removing binding from the set as it is no longer needed
         self.__draw_images(bitmap_data, path_stream_data);
         
+    def __find_node_location(self,station):
+        """this function returns a location where the wind line belongs to among all of the monitors based on mercator projection"""
+        latitude = float(station[1])
+        longitude = float(station[2])
+        result = [];
+        
+        # this part adds to the node where this line is part of over scanning space
+        if((latitude <= 79 and latitude >= 54.548) and(longitude >= -180 and longitude <= -60.021)):
+            #adding for overscanned parts to nodes on each sides
+#             if(longitude<-140 and longitude>=-180): 
+#                 result.append("node_3")
+#             if(longitude >-100 and longitude<=-60.021):
+#                 result.append("node_2");
+                
+            result.append("node_1");
+            
+        elif((latitude <= 79 and latitude >= 54.548) and(longitude >=-60 and longitude <= 59.989)):
+            #adding for overscanned parts to nodes on each sides
+#             if(longitude>20 and longitude<=59.989):
+#                 result.append("node_3")
+#             if(longitude >=-60 and longitude<-20):
+#                 result.append("node_1");
+                
+            result.append("node_2");
+            
+        elif((latitude <= 79 and latitude >= 54.548) and(longitude >=60 and longitude <= 180)):
+            #adding for overscanned parts to nodes on each sides
+#             if(longitude<100 and longitude>=60):
+#                 result.append("node_2")
+#             if(longitude >140 and longitude<=180):
+#                 result.append("node_1");
+                
+            result.append("node_3");
+            
+        elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -180 and longitude <= -60.021)):
+            #adding for overscanned parts to nodes on each sides
+#             if(longitude<-140 and longitude>=-180):
+#                 result.append("node_6")
+#             if(longitude >-100 and longitude<=-60.021):
+#                 result.append("node_5");
+            
+            result.append("node_4");
+        elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -60 and longitude <= 59.989)):
+            #adding for overscanned parts to nodes on each sides
+#             if(longitude>20 and longitude<=59.989):
+#                 result.append("node_6")
+#             if(longitude >=-60 and longitude<-20):
+#                 result.append("node_4");
+                
+            result.append("node_5");
+            
+        elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= 60 and longitude <= 180)):
+            #adding for overscanned parts to nodes on each sides
+#             if(longitude<100 and longitude>=60):
+#                 result.append("node_5")
+#             if(longitude >140 and longitude<=180):
+#                 result.append("node_4");
+            
+            result.append("node_6");
+            
+        elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -180 and longitude <= -60.021)):
+            #adding for overscanned parts to nodes on each sides
+#             if(longitude<-140 and longitude>=-180):
+#                 result.append("node_9")
+#             if(longitude >-100 and longitude<=-60.021):
+#                 result.append("node_8");
+                
+            result.append("node_7");
+            
+        elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -60 and longitude <= 59.989)):
+            #adding for overscanned parts to nodes on each sides
+#             if(longitude>20 and longitude<=59.989):
+#                 result.append("node_9")
+#             if(longitude >=-60 and longitude<-20):
+#                 result.append("node_7");
+                
+            result.append("node_8");
+            
+        elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= 60 and longitude <= 180)):
+            #adding for overscanned parts to nodes on each sides
+#             if(longitude<100 and longitude>=60):
+#                 result.append("node_8")
+#             if(longitude >140 and longitude<=180):
+#                 result.append("node_7");
+                
+            result.append("node_9");
+            
+        return result;
         
     def __interpolate_array(self, a, b):
         """This function interpolates an array between two arrays based on the normalized fraction passed between 0 to 1"""
