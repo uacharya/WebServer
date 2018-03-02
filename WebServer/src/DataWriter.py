@@ -412,46 +412,69 @@ class DataInDifferentFormat(Process):
         starting_x = starting_y = x_frac = y_frac = None; 
         lower_i = lat_zero_degree_index - int(lat);
         lower_j = lon_zero_degree_index + int(lon);
-        
+    
         if(lat < 0):
-            upper_i = lower_i + 1;
+            #checking if this latitude is the last south latitude 
+            if(int(lat) == -89):
+                upper_i = lower_i;
+            else: 
+                upper_i = lower_i + 1;
+    
             starting_y = lower_i;
+    
             if(int(lat) == 0):
                 y_frac = abs(lat);
             else:     
                 y_frac = abs(lat % int(lat));
         else:
-            upper_i = lower_i - 1;
+            #checking if this latitude is the last north latitude 
+            if(int(lat) == 89):
+                upper_i = lower_i;
+            else:
+                upper_i = lower_i - 1;
+    
             starting_y = upper_i;
+            
             if(int(lat) == 0):
                 y_frac = 1 - abs(lat);
             else:
                 y_frac = 1 - abs(lat % int(lat)); 
-            
+    
         if(lon < 0):
-            upper_j = lower_j - 1;
+            #checking if this longitude is the last west longitude
+            if(int(lon)==-180):
+                upper_j = lower_j;
+            else:
+                upper_j = lower_j - 1;
+                
             starting_x = upper_j;
+            
             if(int(lon) == 0):
                 x_frac = 1 - abs(lon);
             else:    
                 x_frac = 1 - abs(lon % int(lon));
         else:
-            upper_j = lower_j + 1;
+            #checking if this longitude is the last east longitude
+            if(int(lon)==180):
+                upper_j=lower_j;
+            else:
+                upper_j = lower_j + 1;
+                
             starting_x = lower_j;
+    
             if(int(lon) == 0):
                 x_frac = abs(lon);
             else:
                 x_frac = abs(lon % int(lon));
-
         # two ends of a interpolation spectrum  
-        upper_coordinates = self.args["projection_coord"][upper_i][upper_j].split(",");
-        lower_coordinates = self.args["projection_coord"][lower_i][lower_j].split(",");
+        upper_coordinates = self.args['projection_coord'][upper_i][upper_j].split(",");
+        lower_coordinates = self.args['projection_coord'][lower_i][lower_j].split(",");
         # getting the difference between two points in the range to interpolate the pixels in both x and y directions
         x_diff = abs(float(lower_coordinates[0]) - float(upper_coordinates[0]));
         y_diff = abs(float(lower_coordinates[1]) - float(upper_coordinates[1]));
         
-        start_coordinates = self.args["projection_coord"][starting_y][starting_x].split(",");
-        return (float(start_coordinates[0]) + (x_frac * x_diff), float(start_coordinates[1]) + (y_frac * y_diff));
+        start_coordinates = self.args['projection_coord'][starting_y][starting_x].split(",");
+        return (float(start_coordinates[0]) + (x_frac * x_diff), float(start_coordinates[1]) + (y_frac * y_diff))
     
     def __tween_the_curves(self, a, b, x0, x1, min_x, max_x):
         """This function creates new parts of a curve based on their location in the new projection if 
