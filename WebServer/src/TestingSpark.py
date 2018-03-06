@@ -309,6 +309,12 @@ def find_new_wind_location(velocity, counter,TOF, list_of_locations):
     total_deflection_in_degree_of_longitude = float(distance_displaced_due_to_coriolis) / float(distance_for_one_degree_longitude);
     
     new_lon = float(current_location[1]) - total_deflection_in_degree_of_longitude;
+    #normalizing longitude between +180 and -180
+    if(new_lon >180):
+        new_lon = (new_lon-180) -180
+    elif(new_lon <-180):
+        new_lon = (new_lon+180) + 180
+        
     # returning deflected new coordinate of the location
     return (current_location[0], new_lon);
     
