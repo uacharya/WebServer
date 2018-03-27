@@ -3,7 +3,7 @@ Created on Feb 29, 2016
 
 @author: Ujjwal Acharya
 '''
-import ast,os;
+import ast,os,json;
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import SocketServer,urlparse;
 from DataCreator import DataCreator,NotPresentError;
@@ -24,7 +24,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             if(queries['op'][0]=='OPEN'):
                 
                 if ("world-map" in path):
-                    file_path = "C:\\Users\\walluser\\javaWorkspace\\D3EventServer\\D3\\WebContent\\world-map.json";             
+                    file_path = "./world-map.json";             
                     #sending all the required headers
                     self.send_response(200,"ok");
                     self.send_header("Access-Control-Allow-Origin","*");
@@ -59,7 +59,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             #sending all the required headers             
             self.send_response(200,"ok");
             self.send_header('mimetype','multipart/json');
-            self.send_header("Access-Control-Allow-Origin","null"); 
+            self.send_header("Access-Control-Allow-Origin","*"); 
             self.send_header("Content-Length",len(output));
             self.send_header('Connection', 'keep-alive');
             self.end_headers();
@@ -77,7 +77,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             #sending all the required headers
             self.send_response(200,"ok");
             self.send_header('mimetype','image/png');
-            self.send_header("Access-Control-Allow-Origin","null");
+            self.send_header("Access-Control-Allow-Origin","*");
             self.send_header("Content-Length",len(output));
             self.send_header('Connection', 'keep-alive');
             self.end_headers();
@@ -91,7 +91,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             #sending all the required headers
             self.send_response(200,"ok");
             self.send_header('mimetype','image/png');
-            self.send_header("Access-Control-Allow-Origin","null");
+            self.send_header("Access-Control-Allow-Origin","*");
             self.send_header("Content-Length",output[0]);
             self.send_header('Connection', 'keep-alive');
             self.end_headers();
@@ -105,7 +105,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             output = data_creator.get_available_data(int(date),int(node),aggregated=True);
             #sending all the required headers
             self.send_response(200,"ok");
-            self.send_header("Access-Control-Allow-Origin","null");
+            self.send_header("Access-Control-Allow-Origin","*");
             self.send_header('mimetype','application/json');
             self.send_header("Content-Length",len(output));
             self.send_header('Connection', 'keep-alive');
@@ -149,20 +149,31 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     
             if(data_type=="RAW"):              
                 try:
-                    response = data_creator.check_available_data(required_data_date, raw=True);
+                    response = [data_creator.check_available_data(required_data_date, raw=True)];
                 except NotPresentError:
-                        response = "not_ready"
+                        response = ["not_ready"]
             elif(data_type=="BITMAP"):
                 try:
-                    response = data_creator.check_available_data(required_data_date,bitmap=True);
+                    response = [data_creator.check_available_data(required_data_date,bitmap=True)];
                 except NotPresentError:
-                        response = "not_ready" 
+                        response = ["not_ready"] 
             elif(data_type=="AGG"):
                 try:
-                    response = data_creator.check_available_data(required_data_date,aggregated=True); 
+                    response = [data_creator.check_available_data(required_data_date,aggregated=True)]; 
                 except NotPresentError:
-                        response = "not_ready"
-               
+                    response = ["not_ready"]
+            
+            #if the inquired data is ready forward to client the next date that is being processed            
+            if("ready" in response):
+                i = date_list.index(required_data_date)
+                #appending a flag to client that there is no more of data left to process
+                if(i==len(date_list)-1):
+                    response.append("done")
+                else: 
+                    response.append(date_list[i+1])
+            
+            #stringifying the response 
+            response = json.dumps(response)
             #sending all the required headers to the client
             self.send_response(200,"ok");
             self.send_header("Access-Control-Allow-Origin","*");
@@ -184,7 +195,7 @@ class ThreadedServer(SocketServer.ThreadingMixIn,HTTPServer):
 def runServer():
     """ The http server which fetches data from hdfs and streams to client upon request """
     try:
-        server_address = ("10.29.3.2", 8085);
+        server_address = ("10.29.2.27", 8085);
         httpServer = ThreadedServer(server_address, CustomHTTPRequestHandler);
         print("web server is running");
         httpServer.serve_forever();     
@@ -195,15 +206,33 @@ def runServer():
         
 if __name__ == '__main__':
     global data_creator; #one object to hold all the data to stream to the client
+    global date_list; #one list object to hold all the dates whose data are stored in HDFS
     #starting the new thread to run server separately
     server = Thread(target=runServer);
     server.start();
+    #creating wall coordinates list for use later in this view
     DataCreator.read_transformed_coordinates_to_array();
     #instance that creates data in different format for each date
-    data_creator =  DataCreator();   
-    data_creator.create_data_for_date(19720101);
-    print(data_creator.check_available_data(19720101,aggregated=True))
-    print(data_creator.check_available_data(19720101,bitmap=True))
-    #continuing with the regular server active process for data creation
+    data_creator =  DataCreator();  
+    date_list=[];
+     
+    from pywebhdfs.webhdfs import PyWebHdfsClient;
+    hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya');
+    
+    dir_listing = hdfs.list_dir('user/uacharya/simulation')
+    #list of dir dictionaries
+    ls_dir = dir_listing['FileStatuses']['FileStatus']
+    #appending to the list all the date which data is stored in hdfs
+    for d in ls_dir:
+        date_list.append(int(d['pathSuffix']))
+        
+    #creating required data in memory for all the data available   
+    for date in date_list:  
+        print("started creaing data for date {}".format(date))  
+        data_creator.create_data_for_date(date);
+        print(data_creator.check_available_data(date,aggregated=True))
+        print(data_creator.check_available_data(date,bitmap=True))
+    
+    
 
     
