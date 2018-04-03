@@ -10,7 +10,7 @@ from cStringIO import StringIO;
 from numpy import interp;
 import numpy as np;
 from PIL import Image, ImageDraw;
-import cPickle,os;
+import cPickle,os, sys;
 
 class DataInDifferentFormat(Process):
     """ This sub process class object is responsible for creating new data in different format as per the requirement"""
@@ -26,14 +26,14 @@ class DataInDifferentFormat(Process):
             self.__create_PNG_images(self.args['interpolation_width'] if ('interpolation_width' in self.args) else 0);
 
         elif("aggregate" in self.args):
-#             from pywebhdfs.webhdfs import PyWebHdfsClient;
-#             hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya'); 
+            from pywebhdfs.webhdfs import PyWebHdfsClient;
+            hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya'); 
             # the file to process
-#             file_path ='user/uacharya/'+str(self.date)+'/node'+str(self.node)+'/output.csv'
-            file_path = "C:\\Users\\walluser\\Desktop\\"+str(self.date)+"\\node_"+str(self.node)+"\\output.csv";
+            file_path ='user/uacharya/flow/'+str(self.date)+'/node_'+str(self.node)+'/output.csv'
+#             file_path = "C:\\Users\\walluser\\Desktop\\"+str(self.date)+"\\node_"+str(self.node)+"\\output.csv";
             # reading as dictionary all the csv rows so that the ones with same streamline ID can be grouped into one list
-#             reader = list(csv.DictReader(StringIO(hdfs.read_file(file_path,buffersize=4096))));
-            reader = list(csv.DictReader(open(file_path,'rb',2048)))
+            reader = list(csv.DictReader(StringIO(hdfs.read_file(file_path,buffersize=4096))));
+#             reader = list(csv.DictReader(open(file_path,'rb',2048)))
             #checking if the file is empty
             if(len(reader)==0):
                 self.__write_data_to_file("");
@@ -47,8 +47,12 @@ class DataInDifferentFormat(Process):
             aggregated_output_data = {};  # local dictionary to write new aggregated data
             upper_bound = 0;  # getting the flow with the highest data points
             
+            total_raw_points = total_agg_points=0
+
             for key, data in nested_data_based_on_id.iteritems():
                 total_data_points_for_a_flow = len(data);
+                total_raw_points+=total_data_points_for_a_flow
+                
                 dist_between_in_degrees = self.__get_diff_in_coord(data[0],data[total_data_points_for_a_flow-1]);
                 
                 if(dist_between_in_degrees==0):
@@ -62,27 +66,31 @@ class DataInDifferentFormat(Process):
                         temp = data[::step];
                         if((total_data_points_for_a_flow - 1) % step != 0):
                             temp.append(data[total_data_points_for_a_flow - 1]); 
+                            
+                        total_agg_points+=len(temp)
                         aggregated_output_data[key] = temp;
                         
                         if(len(temp) > upper_bound):
                             upper_bound = len(temp);
                     else:
+                        total_agg_points+=total_data_points_for_a_flow
                         aggregated_output_data[key] = data;
                         
                         if(total_data_points_for_a_flow > upper_bound):
                             upper_bound = total_data_points_for_a_flow;
                         
                 else: 
+                    total_agg_points+=total_data_points_for_a_flow
                     aggregated_output_data[key] = data;
                     
                     if(total_data_points_for_a_flow > upper_bound):
                         upper_bound = total_data_points_for_a_flow;
-            
+                
             aggregated_output_data['upper_bound'] = upper_bound;
             
             del nested_data_based_on_id;  # removing binding from the dict as it is no longer needed
             
-            self.__write_data_to_file(aggregated_output_data);  
+            self.__write_data_to_file(aggregated_output_data,raw_points=total_raw_points,agg_points=total_agg_points);  
                            
          
     def __get_diff_in_coord(self,entry,exit):
@@ -95,32 +103,34 @@ class DataInDifferentFormat(Process):
         
         return lat_diff if lat_diff>=lon_diff else lon_diff;
             
-    def __write_data_to_file(self, obj):
+    def __write_data_to_file(self, obj,raw_points=None,agg_points=None):
         """This function writes the aggregated data in the form of dictionary to a json file for later use"""
 #         file_path = "./temp_data/agg/data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
-        file_path =  "C:\\D3\\temp\\agg\\data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
+        file_path =  "/hdfs/uacharya/temp_data/agg/data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
         # writing the data to a json file for each date
         with open(file_path, "wb") as f:
             cPickle.dump(obj, f,protocol=cPickle.HIGHEST_PROTOCOL);
         # updating the data dictionary that gives info about the data status
-        self.args["aggregate"].put({"d":self.date,'n':self.node,'agg':True,'p':file_path});
-        print("aggregated finised");    
+        self.args["aggregate"].put({"d":self.date,'n':self.node,'agg':True,'p':file_path,'r_p':raw_points,'a_p':agg_points});
+#         print("aggregated finised");    
                
     def __create_PNG_images(self, interpolation_width): 
         """This function reads the streamline data and created images for all 60 frames based on the data"""
         # dictionary to hold the images data and every path data to stream to client
-        print("the data is for node {}".format(self.node));
+#         print("the data is for node {}".format(self.node));
         path_stream_data = {'stations':[], 'path':[]};
         # list to store all the lines data to draw in bitmap later on
         bitmap_data = [];
         checker = set();
         #binding overscan pixel area on one side to objects property
         self.offset = 1279.891
+        self.offset = 0
+        
         x_offset_per_degrees = self.offset/40;
 #         x_end_points_in_view = (-1279.891,12799.891);
         # the file to process
-#         file_path = "./temp_data/agg/data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
-        file_path = "C:\\D3\\temp\\agg\\data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
+        file_path = "/hdfs/uacharya/temp_data/agg/data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
+#         file_path = "C:\\D3\\temp\\agg\\data_json_" + str(self.date) +"_"+str(self.node)+ ".json";
         #the aggregated data read from memory
         with open(file_path,'rb') as f:
             reader = cPickle.load(f);
@@ -131,6 +141,7 @@ class DataInDifferentFormat(Process):
         # normalizing arrow size based on the number of lines in a particular flow
         upper_bound = reader['upper_bound'];
         del reader['upper_bound'];
+     
         # iterating through every flow between two stations
         for key in reader:
             #list of data for a particular flow for a key
@@ -160,44 +171,44 @@ class DataInDifferentFormat(Process):
                 if(i == len(value) - 1):
                     break;
                 #condition when lines are in left column of tiled display
-                if(self.node in [1,4,7]):
-                    #for start point in a line
-                    if(float(value[i]['Wind_Lon']) > 140 and float(value[i]['Wind_Lon']) <=180):
-                        offset = self.__project_points_to_mercator(-180, float(value[i]['Wind_Lat']));
-                        x_for_lon = ((180 - float(value[i]['Wind_Lon'])) +1) * x_offset_per_degrees;
-                        x0 = (offset[0]-x_for_lon,offset[1])
-                    else:
-                        x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));  
-                        
-                    #for end point in a line
-                    if(float(value[i+1]['Wind_Lon']) > 140 and float(value[i+1]['Wind_Lon']) <=180):
-                        offset = self.__project_points_to_mercator(-180, float(value[i+1]['Wind_Lat']));
-                        x_for_lon = ((180 - float(value[i+1]['Wind_Lon'])) +1) * x_offset_per_degrees;
-                        x1 = (offset[0]-x_for_lon,offset[1])
-                    else:
-                        x1 = self.__project_points_to_mercator(float(value[i+1]['Wind_Lon']), float(value[i+1]['Wind_Lat'])); 
-                    
-                #condition when lines are in right column of tiled display
-                elif(self.node in [3,6,9]):
-                    #for start point in a line
-                    if(float(value[i]['Wind_Lon'])>=-180 and float(value[i]['Wind_Lon']) <-140):
-                        offset = self.__project_points_to_mercator(180, float(value[i]['Wind_Lat']));
-                        x_for_lon = ((180 - abs(float(value[i]['Wind_Lon']))) +1) * x_offset_per_degrees;
-                        x0 = (offset[0]+x_for_lon,offset[1])
-                    else:
-                        x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));  
-                        
-                    #for end point in a line
-                    if(float(value[i+1]['Wind_Lon'])>=-180 and float(value[i+1]['Wind_Lon']) <-140):
-                        offset = self.__project_points_to_mercator(180, float(value[i+1]['Wind_Lat']));
-                        x_for_lon = ((180 - abs(float(value[i+1]['Wind_Lon']))) +1) * x_offset_per_degrees;
-                        x1 = (offset[0]+x_for_lon,offset[1])
-                    else:
-                        x1 = self.__project_points_to_mercator(float(value[i+1]['Wind_Lon']), float(value[i+1]['Wind_Lat'])); 
-                #condition when lines belong to middle column of tiled display
-                else:
-                    x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));
-                    x1 = self.__project_points_to_mercator(float(value[i + 1]['Wind_Lon']), float(value[i + 1]['Wind_Lat']));
+#                 if(self.node in [1,4,7]):
+#                     #for start point in a line
+#                     if(float(value[i]['Wind_Lon']) > 140 and float(value[i]['Wind_Lon']) <=180):
+#                         offset = self.__project_points_to_mercator(-180, float(value[i]['Wind_Lat']));
+#                         x_for_lon = ((180 - float(value[i]['Wind_Lon'])) +1) * x_offset_per_degrees;
+#                         x0 = (offset[0]-x_for_lon,offset[1])
+#                     else:
+#                         x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));  
+#                         
+#                     #for end point in a line
+#                     if(float(value[i+1]['Wind_Lon']) > 140 and float(value[i+1]['Wind_Lon']) <=180):
+#                         offset = self.__project_points_to_mercator(-180, float(value[i+1]['Wind_Lat']));
+#                         x_for_lon = ((180 - float(value[i+1]['Wind_Lon'])) +1) * x_offset_per_degrees;
+#                         x1 = (offset[0]-x_for_lon,offset[1])
+#                     else:
+#                         x1 = self.__project_points_to_mercator(float(value[i+1]['Wind_Lon']), float(value[i+1]['Wind_Lat'])); 
+#                     
+#                 #condition when lines are in right column of tiled display
+#                 elif(self.node in [3,6,9]):
+#                     #for start point in a line
+#                     if(float(value[i]['Wind_Lon'])>=-180 and float(value[i]['Wind_Lon']) <-140):
+#                         offset = self.__project_points_to_mercator(180, float(value[i]['Wind_Lat']));
+#                         x_for_lon = ((180 - abs(float(value[i]['Wind_Lon']))) +1) * x_offset_per_degrees;
+#                         x0 = (offset[0]+x_for_lon,offset[1])
+#                     else:
+#                         x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));  
+#                         
+#                     #for end point in a line
+#                     if(float(value[i+1]['Wind_Lon'])>=-180 and float(value[i+1]['Wind_Lon']) <-140):
+#                         offset = self.__project_points_to_mercator(180, float(value[i+1]['Wind_Lat']));
+#                         x_for_lon = ((180 - abs(float(value[i+1]['Wind_Lon']))) +1) * x_offset_per_degrees;
+#                         x1 = (offset[0]+x_for_lon,offset[1])
+#                     else:
+#                         x1 = self.__project_points_to_mercator(float(value[i+1]['Wind_Lon']), float(value[i+1]['Wind_Lat'])); 
+#                 #condition when lines belong to middle column of tiled display
+#                 else:
+                x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));
+                x1 = self.__project_points_to_mercator(float(value[i + 1]['Wind_Lon']), float(value[i + 1]['Wind_Lat']));
                 #adding new lines in between was only necessary if we start with different rotation angle than zero or server does panning
                 #which is not the case here so it was removed
                 # temp = self.__tween_the_curves(value[i], value[i + 1], x0, x1, x_end_points_in_view[0], x_end_points_in_view[1]);
@@ -238,81 +249,81 @@ class DataInDifferentFormat(Process):
         # this part adds to the node where this line is part of over scanning space
         if((latitude <= 79 and latitude >= 54.548) and(longitude >= -180 and longitude <= -60.021)):
             #adding for overscanned parts to nodes on each sides
-            if(longitude<-140 and longitude>=-180): 
-                result.append("node_3")
-            if(longitude >-100 and longitude<=-60.021):
-                result.append("node_2");
+#             if(longitude<-140 and longitude>=-180): 
+#                 result.append("node_3")
+#             if(longitude >-100 and longitude<=-60.021):
+#                 result.append("node_2");
                 
             result.append("node_1");
             
         elif((latitude <= 79 and latitude >= 54.548) and(longitude >=-60 and longitude <= 59.989)):
             #adding for overscanned parts to nodes on each sides
-            if(longitude>20 and longitude<=59.989):
-                result.append("node_3")
-            if(longitude >=-60 and longitude<-20):
-                result.append("node_1");
+#             if(longitude>20 and longitude<=59.989):
+#                 result.append("node_3")
+#             if(longitude >=-60 and longitude<-20):
+#                 result.append("node_1");
                 
             result.append("node_2");
             
         elif((latitude <= 79 and latitude >= 54.548) and(longitude >=60 and longitude <= 180)):
             #adding for overscanned parts to nodes on each sides
-            if(longitude<100 and longitude>=60):
-                result.append("node_2")
-            if(longitude >140 and longitude<=180):
-                result.append("node_1");
+#             if(longitude<100 and longitude>=60):
+#                 result.append("node_2")
+#             if(longitude >140 and longitude<=180):
+#                 result.append("node_1");
                 
             result.append("node_3");
             
         elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -180 and longitude <= -60.021)):
             #adding for overscanned parts to nodes on each sides
-            if(longitude<-140 and longitude>=-180):
-                result.append("node_6")
-            if(longitude >-100 and longitude<=-60.021):
-                result.append("node_5");
+#             if(longitude<-140 and longitude>=-180):
+#                 result.append("node_6")
+#             if(longitude >-100 and longitude<=-60.021):
+#                 result.append("node_5");
             
             result.append("node_4");
         elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -60 and longitude <= 59.989)):
             #adding for overscanned parts to nodes on each sides
-            if(longitude>20 and longitude<=59.989):
-                result.append("node_6")
-            if(longitude >=-60 and longitude<-20):
-                result.append("node_4");
+#             if(longitude>20 and longitude<=59.989):
+#                 result.append("node_6")
+#             if(longitude >=-60 and longitude<-20):
+#                 result.append("node_4");
                 
             result.append("node_5");
             
         elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= 60 and longitude <= 180)):
             #adding for overscanned parts to nodes on each sides
-            if(longitude<100 and longitude>=60):
-                result.append("node_5")
-            if(longitude >140 and longitude<=180):
-                result.append("node_4");
+#             if(longitude<100 and longitude>=60):
+#                 result.append("node_5")
+#             if(longitude >140 and longitude<=180):
+#                 result.append("node_4");
             
             result.append("node_6");
             
         elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -180 and longitude <= -60.021)):
             #adding for overscanned parts to nodes on each sides
-            if(longitude<-140 and longitude>=-180):
-                result.append("node_9")
-            if(longitude >-100 and longitude<=-60.021):
-                result.append("node_8");
+#             if(longitude<-140 and longitude>=-180):
+#                 result.append("node_9")
+#             if(longitude >-100 and longitude<=-60.021):
+#                 result.append("node_8");
                 
             result.append("node_7");
             
         elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -60 and longitude <= 59.989)):
             #adding for overscanned parts to nodes on each sides
-            if(longitude>20 and longitude<=59.989):
-                result.append("node_9")
-            if(longitude >=-60 and longitude<-20):
-                result.append("node_7");
+#             if(longitude>20 and longitude<=59.989):
+#                 result.append("node_9")
+#             if(longitude >=-60 and longitude<-20):
+#                 result.append("node_7");
                 
             result.append("node_8");
             
         elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= 60 and longitude <= 180)):
             #adding for overscanned parts to nodes on each sides
-            if(longitude<100 and longitude>=60):
-                result.append("node_8")
-            if(longitude >140 and longitude<=180):
-                result.append("node_7");
+#             if(longitude<100 and longitude>=60):
+#                 result.append("node_8")
+#             if(longitude >140 and longitude<=180):
+#                 result.append("node_7");
                 
             result.append("node_9");
             
@@ -344,13 +355,13 @@ class DataInDifferentFormat(Process):
         
     def __draw_images(self, bitmap_data, path_stream_data):
         """This function creates PNG images for each frame of streamline flow animation and stores them in stream data to stream later on"""
-#         dir_path = "./temp_data/bitmap/" + str(self.date) +"/"+str(self.node);
-        dir_path = "C:\\D3\\temp\\bitmap\\" + str(self.date) +"\\"+str(self.node);
+        dir_path = "/hdfs/uacharya/temp_data/bitmap/" + str(self.date) +"/"+str(self.node);
+#         dir_path = "C:\\D3\\temp\\bitmap\\" + str(self.date) +"\\"+str(self.node);
         #checking if the directory exists or not
         if not(os.path.exists(dir_path)):
-            os.makedirs(dir_path+"\\imgs");
+            os.makedirs(dir_path+"/imgs");
         #path for writing lines data in ascii format for streaming to client
-        file_path = dir_path+"\\data.json";
+        file_path = dir_path+"/data.json";
         
         #writing empty image data and file if the raw data is empty
         if(not path_stream_data['path']):
@@ -394,7 +405,7 @@ class DataInDifferentFormat(Process):
               
                 draw.polygon([end[0]+math.ceil(self.offset), end[1], left[0]+math.ceil(self.offset), left[1], right[0]+math.ceil(self.offset), right[1], end[0]+math.ceil(self.offset),end[1]], fill="white", outline="white");
                 
-            img.save(dir_path+"\\imgs\\" + str(frame) + ".png", "PNG", quality=100);
+            img.save(dir_path+"/imgs/" + str(frame) + ".png", "PNG", quality=100);
 
         # writing the data to a json file for each date
         with open(file_path, "wb") as f:

@@ -54,32 +54,36 @@ class DataCreator(object):
         
         q= Queue();
         # call the class that should create data in two additional formats
-        for i in [8]:
+        for i in xrange(9):
             agg_obj = DataInDifferentFormat(date,i+1, aggregate=q);
             agg_obj.start();
             list_of_processes.append(agg_obj);
                            
+#         import datetime;
+#         start = datetime.datetime.now();
+        total_data_points_for_raw = total_data_points_for_agg = 0
         list_of_threads=[];      
-        import datetime;
-        start = datetime.datetime.now();
         counter=1;
         while counter<=len(list_of_processes):
             try:
                 response = q.get();
                 res_date,res_node,res_path = response['d'],response['n'],response['p'];
                 if('agg' in response):
-                    agg_thread=ReadIntoMemory(self.__aggregated_data_for_date[res_date][res_node-1],res_path,agg=True);
-                    agg_thread.start();
-                    list_of_threads.append(agg_thread);
-                    #starting a new process that creates bitmap data based on previously aggregated data 
-                    bitmap_obj = DataInDifferentFormat(res_date,res_node, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
-                    bitmap_obj.start();
-                    list_of_processes.append(bitmap_obj);
+                    total_data_points_for_raw+= response['r_p']
+                    total_data_points_for_agg+= response['a_p']
                     
-                elif('bmp' in response):
-                    bitmap_thread = ReadIntoMemory(self.__canvas_data_for_date[res_date][res_node-1],res_path,bitmap=True);
-                    bitmap_thread.start()
-                    list_of_threads.append(bitmap_thread);
+#                     agg_thread=ReadIntoMemory(self.__aggregated_data_for_date[res_date][res_node-1],res_path,agg=True);
+#                     agg_thread.start();
+#                     list_of_threads.append(agg_thread);
+#                     #starting a new process that creates bitmap data based on previously aggregated data 
+#                     bitmap_obj = DataInDifferentFormat(res_date,res_node, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
+#                     bitmap_obj.start();
+#                     list_of_processes.append(bitmap_obj);
+                    
+#                 elif('bmp' in response):
+#                     bitmap_thread = ReadIntoMemory(self.__canvas_data_for_date[res_date][res_node-1],res_path,bitmap=True);
+#                     bitmap_thread.start()
+#                     list_of_threads.append(bitmap_thread);
                 counter+=1;
             except Exception as e:
                 print(e.message);
@@ -87,12 +91,15 @@ class DataCreator(object):
         for t in range(len(list_of_threads)):
             list_of_threads[t].join();
               
-        end = datetime.datetime.now();
-        diff = end - start;
-        elapsed_ms = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000);
-        print(elapsed_ms);  
+#         end = datetime.datetime.now();
+#         diff = end - start;
+#         elapsed_ms = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000);
+#         print(elapsed_ms);  
         for i in range(len(list_of_processes)):
             list_of_processes[i].join();
+            
+        print("the total raw data points for this date {} is {}".format(date,total_data_points_for_raw))
+        print("the total aggregated data points for this date {} is {}".format(date,total_data_points_for_agg))
         
     def check_available_data(self, date, raw=False, bitmap=False, aggregated=False):
         """ Function which checks if the data is available to stream to the client based on the parameters passed"""
@@ -162,7 +169,7 @@ class DataCreator(object):
         # only when list is empty
         if(cls.mercator_projected_coordinates == None):
             cls.mercator_projected_coordinates = [];
-            with open("C:\\Users\\walluser\\javaWorkspace\\D3EventServer\\D3\\WebContent\\wall_coord_data.txt", "r") as read_file:
+            with open("wall_coord_data.txt", "r") as read_file:
                 for line in read_file:
                     contents = line.split();
                     cls.mercator_projected_coordinates.append(contents);
@@ -200,7 +207,7 @@ class ReadIntoMemory(Thread):
             
         elif("bitmap" in self.arg):
             #putting the line data into a object to stream
-            with open(self.path+"\\data.json","rb")as f:
+            with open(self.path+"/data.json","rb")as f:
                 self.data_holder['data'] = json.dumps(cPickle.load(f));          
 #             with open(self.path+"\\data.json","rb")as f:
 #                 output = cPickle.load(f);  
@@ -221,7 +228,7 @@ class ReadIntoMemory(Thread):
             #reading all the images to memory to stream
             for x in xrange(1,31):
                 buf_string = cStringIO.StringIO();
-                Image.open(self.path+"\\imgs\\"+str(x)+".png").save(buf_string, format="PNG", quality=100);
+                Image.open(self.path+"/imgs/"+str(x)+".png").save(buf_string, format="PNG", quality=100);
                 content_length = content_length+(buf_string.tell()+4); 
                 PNGS.append(struct.pack('>I',buf_string.tell())+buf_string.getvalue());
                 buf_string.close();
