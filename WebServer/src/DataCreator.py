@@ -69,21 +69,25 @@ class DataCreator(object):
                 response = q.get();
                 res_date,res_node,res_path = response['d'],response['n'],response['p'];
                 if('agg' in response):
-                    total_data_points_for_raw+= response['r_p']
-                    total_data_points_for_agg+= response['a_p']
+                    #checking if a child process is created or not 
+                    if(response['r_p']!=None):
+                        total_data_points_for_raw+= response['r_p']
+                    if(response['a_p']!=None):
+                        total_data_points_for_agg+= response['a_p']
+
+                    agg_thread=ReadIntoMemory(self.__aggregated_data_for_date[res_date][res_node-1],res_path,agg=True);
+                    agg_thread.start();
+                    list_of_threads.append(agg_thread);
+                    #starting a new process that creates bitmap data based on previously aggregated data 
+                    bitmap_obj = DataInDifferentFormat(res_date,res_node, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
+                    bitmap_obj.start();
+                    list_of_processes.append(bitmap_obj);
                     
-#                     agg_thread=ReadIntoMemory(self.__aggregated_data_for_date[res_date][res_node-1],res_path,agg=True);
-#                     agg_thread.start();
-#                     list_of_threads.append(agg_thread);
-#                     #starting a new process that creates bitmap data based on previously aggregated data 
-#                     bitmap_obj = DataInDifferentFormat(res_date,res_node, bitmap=q,projection_coord= DataCreator.mercator_projected_coordinates,interpolation_width=0);
-#                     bitmap_obj.start();
-#                     list_of_processes.append(bitmap_obj);
+                elif('bmp' in response):
+                    bitmap_thread = ReadIntoMemory(self.__canvas_data_for_date[res_date][res_node-1],res_path,bitmap=True);
+                    bitmap_thread.start()
+                    list_of_threads.append(bitmap_thread);
                     
-#                 elif('bmp' in response):
-#                     bitmap_thread = ReadIntoMemory(self.__canvas_data_for_date[res_date][res_node-1],res_path,bitmap=True);
-#                     bitmap_thread.start()
-#                     list_of_threads.append(bitmap_thread);
                 counter+=1;
             except Exception as e:
                 print(e.message);
