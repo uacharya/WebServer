@@ -87,8 +87,8 @@ def compare_data_between(date, first_station, second_station,dataset):
             if(first_station_pressure > second_station_pressure):
                 source_id = first_station['Station_Id'].strip();
                 destination_id = second_station['Station_Id'].strip();
-                source_name = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
-                destination_name = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
+                source_name = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","").replace("&","").replace("'","").replace("?","").replace("#","").replace("=","").replace("*","").replace("`","")
+                destination_name = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","").replace("&","").replace("'","").replace("?","").replace("#","").replace("=","").replace("*","").replace("`","")
                 ID = source_id+"t"+destination_id;
                 #checking if the data for particular pair has already been written
                 data=None;
@@ -99,7 +99,7 @@ def compare_data_between(date, first_station, second_station,dataset):
                 else:
                     table.put(ID.encode(),{('f:'+date).encode():'y'.encode()});
                 
-        # getting the final destination wind velocity using bernoulli principle
+                # getting the final destination wind velocity using bernoulli principle
                 temp_value = 2 * (((first_station_pressure / first_station_air_density) - (second_station_pressure / second_station_air_density)) + 
                                             (717 * (float(first_station["Temperature"]) - float(second_station["Temperature"]))) + 
                                             (9.8 * (float(first_station["Station_Elevation"]) - float(second_station["Station_Elevation"]))) + 
@@ -117,8 +117,8 @@ def compare_data_between(date, first_station, second_station,dataset):
             elif second_station_pressure>first_station_pressure:
                 source_id= second_station['Station_Id'].strip();
                 destination_id = first_station['Station_Id'].strip();
-                source_name = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
-                destination_name = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","");
+                source_name = second_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","").replace("&","").replace("'","").replace("?","").replace("#","").replace("=","").replace("*","").replace("`","");
+                destination_name = first_station["Station_Name"].replace(" ","_").replace("/","_").replace(":","_").replace(".","").replace(";","").replace(",","").replace("(","").replace(")","").replace("&","").replace("'","").replace("?","").replace("#","").replace("=","").replace("*","").replace("`","");
                 ID = source_id+"t"+destination_id;
                 #checking if the data for particular pair has already been written
                 data=None;
@@ -420,8 +420,7 @@ def find_node_location(coordinates):
         
     return result;
         
-    
-                
+              
 if __name__ == '__main__':
     import happybase;
     # configure the spark environment
@@ -430,7 +429,7 @@ if __name__ == '__main__':
     sc = SparkContext(conf=sparkConf);
     sc.addPyFile("module.zip");      
 #     from pywebhdfs.webhdfs import PyWebHdfsClient;
-    distributed_dataset = sc.textFile("hdfs:/user/uacharya/subset_dataset_1972.txt",use_unicode=False,minPartitions=240);
+    distributed_dataset = sc.textFile("hdfs:/user/uacharya/110_Stations_Data_Combined.txt",use_unicode=False,minPartitions=24);
     print("this is the driver container");
     # getting the header of the whole dataset
     header = distributed_dataset.first();
@@ -444,15 +443,15 @@ if __name__ == '__main__':
     print("total keys "+str(len(temp)));
     #sorting keys to create data in chronological order based on date
     sorted_keys = sorted(temp,key=int);
-   #connecting to database for writing checker data
+    #connecting to database for writing checker data
     database = happybase.ConnectionPool(size=1,host='cshadoop.boisestate.edu');
-     #getting a connection from the pool
-#    with database.connection() as db:
-#        db.create_table('fChecker'.encode(),{'f'.encode():dict(max_versions=1,in_memory=True)});
+    #getting a connection from the pool
+    with database.connection() as db:
+        db.create_table('fChecker'.encode(),{'f'.encode():dict(max_versions=1,in_memory=True)});
     #creating batch processing with new rdd each iteration based on key values
-    for key in sorted_keys[17:]:   
+    for key in sorted_keys:   
         print(key);
-        keyed_rdd = data_in_required_format.filter(lambda t: t[0]==key).map(lambda t: t[1]).coalesce(120, shuffle=True);
+        keyed_rdd = data_in_required_format.filter(lambda t: t[0]==key).map(lambda t: t[1]).coalesce(48, shuffle=True);
         keyed_rdd.cache();
         #collecting all the dataset for broadcasting
         broadcast_data = keyed_rdd.collect();
@@ -471,8 +470,8 @@ if __name__ == '__main__':
         keyed_rdd.unpersist();
 
         global hbase;
-    global hdfs;
-    hbase = hdfs = None;#setting both global variables for each task to None so that these connection objects are only created inside executor and not serialized when sending task to them.
+        global hdfs;
+        hbase = hdfs = None;#setting both global variables for each task to None so that these connection objects are only created inside executor and not serialized when sending task to them.
     
     sc.stop();
     
