@@ -30,14 +30,14 @@ class DataCreator(object):
         for index in xrange(0, 9):
             self.__raw_data_for_date[date].append({"indicator":"ready", "data":None});
         #array containing all the threaded objects reading files into memory
-#         list_of_threads=[];  
-#         for index in xrange(0,9):
-#             raw_thread= ReadIntoMemory(self.__raw_data_for_date[date][index],"C:\\D3\\temp\\"+str(date)+"\\node"+str(index+1)+"\\output.csv",raw=True);
-#             raw_thread.start();
-#             list_of_threads.append(raw_thread); 
-# #         
-#         for t in list_of_threads:
-#             t.join();
+        list_of_threads=[];  
+        for index in xrange(0,9):
+            raw_thread= ReadIntoMemory(self.__raw_data_for_date[date][index],None,raw=True,d=date,n=index+1)
+            raw_thread.start();
+            list_of_threads.append(raw_thread); 
+        
+        for t in list_of_threads:
+            t.join();
         # adding a key for the date which bitmap data is to be created  
         self.__canvas_data_for_date[date] = [];
         # add the indicator that bitmap data is not ready for all the node for a date 
@@ -58,9 +58,8 @@ class DataCreator(object):
             agg_obj = DataInDifferentFormat(date,i+1, aggregate=q);
             agg_obj.start();
             list_of_processes.append(agg_obj);
-                           
-#         import datetime;
-#         start = datetime.datetime.now();
+        
+        #variables for calculating the total data points for each format
         total_data_points_for_raw = total_data_points_for_agg = 0
         list_of_threads=[];      
         counter=1;
@@ -95,13 +94,9 @@ class DataCreator(object):
         for t in range(len(list_of_threads)):
             list_of_threads[t].join();
               
-#         end = datetime.datetime.now();
-#         diff = end - start;
-#         elapsed_ms = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000);
-#         print(elapsed_ms);  
         for i in range(len(list_of_processes)):
             list_of_processes[i].join();
-            
+          
         print("the total raw data points for this date {} is {}".format(date,total_data_points_for_raw))
         print("the total aggregated data points for this date {} is {}".format(date,total_data_points_for_agg))
         
@@ -203,9 +198,12 @@ class ReadIntoMemory(Thread):
             self.data_holder["indicator"]='ready'; 
         
         elif("raw" in self.arg):
+            from pywebhdfs.webhdfs import PyWebHdfsClient;
+            hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya');
+            
+            file_path = 'user/uacharya/flow/'+str(self.arg['d'])+'/node_'+str(self.arg['n'])+'/output.csv'
             #reading the csv files in the memory
-            with open(self.path,"r") as f:
-                self.data_holder['data']=f.read();
+            self.data_holder['data']= hdfs.read_file(file_path,buffersize=4096) 
                 
             self.data_holder["indicator"]='ready'; 
             
