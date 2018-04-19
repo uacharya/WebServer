@@ -123,9 +123,7 @@ class DataInDifferentFormat(Process):
         bitmap_data = [];
         checker = set();
         #binding overscan pixel area on one side to objects property
-        self.offset = 1279.891
-        self.offset = 0
-        
+        self.offset = 1279.891    
         x_offset_per_degrees = self.offset/40;
 #         x_end_points_in_view = (-1279.891,12799.891);
         # the file to process
@@ -170,45 +168,48 @@ class DataInDifferentFormat(Process):
             for i in xrange(len(value)):
                 if(i == len(value) - 1):
                     break;
+                
+                if(abs(float(value[i]['Wind_Lon'])-float(value[i+1]['Wind_Lon'])))>8:
+                    continue;
                 #condition when lines are in left column of tiled display
-#                 if(self.node in [1,4,7]):
-#                     #for start point in a line
-#                     if(float(value[i]['Wind_Lon']) > 140 and float(value[i]['Wind_Lon']) <=180):
-#                         offset = self.__project_points_to_mercator(-180, float(value[i]['Wind_Lat']));
-#                         x_for_lon = ((180 - float(value[i]['Wind_Lon'])) +1) * x_offset_per_degrees;
-#                         x0 = (offset[0]-x_for_lon,offset[1])
-#                     else:
-#                         x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));  
-#                         
-#                     #for end point in a line
-#                     if(float(value[i+1]['Wind_Lon']) > 140 and float(value[i+1]['Wind_Lon']) <=180):
-#                         offset = self.__project_points_to_mercator(-180, float(value[i+1]['Wind_Lat']));
-#                         x_for_lon = ((180 - float(value[i+1]['Wind_Lon'])) +1) * x_offset_per_degrees;
-#                         x1 = (offset[0]-x_for_lon,offset[1])
-#                     else:
-#                         x1 = self.__project_points_to_mercator(float(value[i+1]['Wind_Lon']), float(value[i+1]['Wind_Lat'])); 
-#                     
-#                 #condition when lines are in right column of tiled display
-#                 elif(self.node in [3,6,9]):
-#                     #for start point in a line
-#                     if(float(value[i]['Wind_Lon'])>=-180 and float(value[i]['Wind_Lon']) <-140):
-#                         offset = self.__project_points_to_mercator(180, float(value[i]['Wind_Lat']));
-#                         x_for_lon = ((180 - abs(float(value[i]['Wind_Lon']))) +1) * x_offset_per_degrees;
-#                         x0 = (offset[0]+x_for_lon,offset[1])
-#                     else:
-#                         x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));  
-#                         
-#                     #for end point in a line
-#                     if(float(value[i+1]['Wind_Lon'])>=-180 and float(value[i+1]['Wind_Lon']) <-140):
-#                         offset = self.__project_points_to_mercator(180, float(value[i+1]['Wind_Lat']));
-#                         x_for_lon = ((180 - abs(float(value[i+1]['Wind_Lon']))) +1) * x_offset_per_degrees;
-#                         x1 = (offset[0]+x_for_lon,offset[1])
-#                     else:
-#                         x1 = self.__project_points_to_mercator(float(value[i+1]['Wind_Lon']), float(value[i+1]['Wind_Lat'])); 
-#                 #condition when lines belong to middle column of tiled display
-#                 else:
-                x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));
-                x1 = self.__project_points_to_mercator(float(value[i + 1]['Wind_Lon']), float(value[i + 1]['Wind_Lat']));
+                if(self.node in [1,4,7]):
+                    #for start point in a line
+                    if(float(value[i]['Wind_Lon']) > 140 and float(value[i]['Wind_Lon']) <=180):
+                        offset = self.__project_points_to_mercator(-180, float(value[i]['Wind_Lat']));
+                        x_for_lon = (180 - float(value[i]['Wind_Lon'])) * x_offset_per_degrees;
+                        x0 = (offset[0]-x_for_lon,offset[1])
+                    else:
+                        x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));  
+                         
+                    #for end point in a line
+                    if(float(value[i+1]['Wind_Lon']) > 140 and float(value[i+1]['Wind_Lon']) <=180):
+                        offset = self.__project_points_to_mercator(-180, float(value[i+1]['Wind_Lat']));
+                        x_for_lon = (180 - float(value[i+1]['Wind_Lon'])) * x_offset_per_degrees;
+                        x1 = (offset[0]-x_for_lon,offset[1])
+                    else:
+                        x1 = self.__project_points_to_mercator(float(value[i+1]['Wind_Lon']), float(value[i+1]['Wind_Lat'])); 
+                     
+                #condition when lines are in right column of tiled display
+                elif(self.node in [3,6,9]):
+                    #for start point in a line
+                    if(float(value[i]['Wind_Lon'])>=-180 and float(value[i]['Wind_Lon']) <-140):
+                        offset = self.__project_points_to_mercator(180, float(value[i]['Wind_Lat']));
+                        x_for_lon = (180 - abs(float(value[i]['Wind_Lon']))) * x_offset_per_degrees;
+                        x0 = (offset[0]+x_for_lon,offset[1])
+                    else:
+                        x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));  
+                         
+                    #for end point in a line
+                    if(float(value[i+1]['Wind_Lon'])>=-180 and float(value[i+1]['Wind_Lon']) <-140):
+                        offset = self.__project_points_to_mercator(180, float(value[i+1]['Wind_Lat']));
+                        x_for_lon = (180 - abs(float(value[i+1]['Wind_Lon']))) * x_offset_per_degrees;
+                        x1 = (offset[0]+x_for_lon,offset[1])
+                    else:
+                        x1 = self.__project_points_to_mercator(float(value[i+1]['Wind_Lon']), float(value[i+1]['Wind_Lat'])); 
+                #condition when lines belong to middle column of tiled display
+                else:
+                    x0 = self.__project_points_to_mercator(float(value[i]['Wind_Lon']), float(value[i]['Wind_Lat']));
+                    x1 = self.__project_points_to_mercator(float(value[i + 1]['Wind_Lon']), float(value[i + 1]['Wind_Lat']));
                 #adding new lines in between was only necessary if we start with different rotation angle than zero or server does panning
                 #which is not the case here so it was removed
                 # temp = self.__tween_the_curves(value[i], value[i + 1], x0, x1, x_end_points_in_view[0], x_end_points_in_view[1]);
@@ -249,81 +250,81 @@ class DataInDifferentFormat(Process):
         # this part adds to the node where this line is part of over scanning space
         if((latitude <= 79 and latitude >= 54.548) and(longitude >= -180 and longitude <= -60.021)):
             #adding for overscanned parts to nodes on each sides
-#             if(longitude<-140 and longitude>=-180): 
-#                 result.append("node_3")
-#             if(longitude >-100 and longitude<=-60.021):
-#                 result.append("node_2");
+            if(longitude<-140 and longitude>=-180): 
+                result.append("node_3")
+            if(longitude >-100 and longitude<=-60.021):
+                result.append("node_2");
                 
             result.append("node_1");
             
         elif((latitude <= 79 and latitude >= 54.548) and(longitude >=-60 and longitude <= 59.989)):
             #adding for overscanned parts to nodes on each sides
-#             if(longitude>20 and longitude<=59.989):
-#                 result.append("node_3")
-#             if(longitude >=-60 and longitude<-20):
-#                 result.append("node_1");
+            if(longitude>20 and longitude<=59.989):
+                result.append("node_3")
+            if(longitude >=-60 and longitude<-20):
+                result.append("node_1");
                 
             result.append("node_2");
             
         elif((latitude <= 79 and latitude >= 54.548) and(longitude >=60 and longitude <= 180)):
             #adding for overscanned parts to nodes on each sides
-#             if(longitude<100 and longitude>=60):
-#                 result.append("node_2")
-#             if(longitude >140 and longitude<=180):
-#                 result.append("node_1");
+            if(longitude<100 and longitude>=60):
+                result.append("node_2")
+            if(longitude >140 and longitude<=180):
+                result.append("node_1");
                 
             result.append("node_3");
             
         elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -180 and longitude <= -60.021)):
             #adding for overscanned parts to nodes on each sides
-#             if(longitude<-140 and longitude>=-180):
-#                 result.append("node_6")
-#             if(longitude >-100 and longitude<=-60.021):
-#                 result.append("node_5");
+            if(longitude<-140 and longitude>=-180):
+                result.append("node_6")
+            if(longitude >-100 and longitude<=-60.021):
+                result.append("node_5");
             
             result.append("node_4");
         elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= -60 and longitude <= 59.989)):
             #adding for overscanned parts to nodes on each sides
-#             if(longitude>20 and longitude<=59.989):
-#                 result.append("node_6")
-#             if(longitude >=-60 and longitude<-20):
-#                 result.append("node_4");
+            if(longitude>20 and longitude<=59.989):
+                result.append("node_6")
+            if(longitude >=-60 and longitude<-20):
+                result.append("node_4");
                 
             result.append("node_5");
             
         elif((latitude <=54.52 and latitude >= -2.155) and(longitude >= 60 and longitude <= 180)):
             #adding for overscanned parts to nodes on each sides
-#             if(longitude<100 and longitude>=60):
-#                 result.append("node_5")
-#             if(longitude >140 and longitude<=180):
-#                 result.append("node_4");
+            if(longitude<100 and longitude>=60):
+                result.append("node_5")
+            if(longitude >140 and longitude<=180):
+                result.append("node_4");
             
             result.append("node_6");
             
         elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -180 and longitude <= -60.021)):
             #adding for overscanned parts to nodes on each sides
-#             if(longitude<-140 and longitude>=-180):
-#                 result.append("node_9")
-#             if(longitude >-100 and longitude<=-60.021):
-#                 result.append("node_8");
+            if(longitude<-140 and longitude>=-180):
+                result.append("node_9")
+            if(longitude >-100 and longitude<=-60.021):
+                result.append("node_8");
                 
             result.append("node_7");
             
         elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= -60 and longitude <= 59.989)):
             #adding for overscanned parts to nodes on each sides
-#             if(longitude>20 and longitude<=59.989):
-#                 result.append("node_9")
-#             if(longitude >=-60 and longitude<-20):
-#                 result.append("node_7");
+            if(longitude>20 and longitude<=59.989):
+                result.append("node_9")
+            if(longitude >=-60 and longitude<-20):
+                result.append("node_7");
                 
             result.append("node_8");
             
         elif((latitude <=-2.187 and latitude >= -56.97) and(longitude >= 60 and longitude <= 180)):
             #adding for overscanned parts to nodes on each sides
-#             if(longitude<100 and longitude>=60):
-#                 result.append("node_8")
-#             if(longitude >140 and longitude<=180):
-#                 result.append("node_7");
+            if(longitude<100 and longitude>=60):
+                result.append("node_8")
+            if(longitude >140 and longitude<=180):
+                result.append("node_7");
                 
             result.append("node_9");
             

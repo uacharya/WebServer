@@ -219,7 +219,7 @@ if __name__ == '__main__':
     from pywebhdfs.webhdfs import PyWebHdfsClient;
     hdfs = PyWebHdfsClient(host='cshadoop.boisestate.edu',port='50070', user_name='uacharya');
     
-    dir_listing = hdfs.list_dir('user/uacharya/simulation')
+    dir_listing = hdfs.list_dir('user/uacharya/flow')
     #list of dir dictionaries
     ls_dir = dir_listing['FileStatuses']['FileStatus']
     #appending to the list all the date which data is stored in hdfs
