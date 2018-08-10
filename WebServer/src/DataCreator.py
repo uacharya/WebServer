@@ -4,13 +4,11 @@ Created on Jun 7, 2017
 @author: Uzwal
 '''
 from threading import Thread;
-from multiprocessing import Pipe, Queue;
+from multiprocessing import Queue;
 from DataWriter import DataInDifferentFormat,InvalidFormatError;
 import cStringIO,struct,json;
 import cPickle;
 from PIL import Image; 
-from base64 import b64encode;
-import msgpack;
 
 class DataCreator(object):
     """Class which is responsible for creating the data in different formats and streaming to the client upon request"""

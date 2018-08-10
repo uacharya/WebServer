@@ -10,7 +10,7 @@ from cStringIO import StringIO;
 from numpy import interp;
 import numpy as np;
 from PIL import Image, ImageDraw;
-import cPickle,os, sys;
+import cPickle,os;
 
 class DataInDifferentFormat(Process):
     """ This sub process class object is responsible for creating new data in different format as per the requirement"""
@@ -224,7 +224,6 @@ class DataInDifferentFormat(Process):
                         angle = math.atan2(end_point[1] - start_point[1], end_point[0] - start_point[0]);
                         velocity = value[i + 1]['Wind_Velocity'];
                         move_angle = 30 * (math.pi / 180);
-                        before_angle = (math.pi + angle) - move_angle;
                         after_angle = (math.pi + angle) + move_angle;
                         hypo = abs(arrow_size/ math.cos(move_angle));
                         # creating an object and appending its info to stream to client
